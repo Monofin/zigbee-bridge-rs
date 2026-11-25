@@ -4,6 +4,28 @@ A Zigbee coordinator for Linux that connects Ember radios to MQTT 5 and Home Ass
 
 The serial adapter must run Ember coordinator firmware speaking EZSP 13 or 19. Device support depends on the endpoints and clusters a device advertises and, for some products, a matching device profile. Check the [coverage guide](COVERAGE.md) before migrating devices you rely on.
 
+## Deploy with Docker Compose
+
+Use this method on Linux with Docker Engine, Compose v2, a commissioned Ember USB coordinator and a reachable MQTT 5 broker. Compose builds the image from the checked-out source. For a new radio, [form the network](REFERENCE.md#bench-coordinator) first. To take over a running Zigbee2MQTT installation, use the [supervised migration](INSTALL.md#side-by-side-trial-with-a-docker-based-z2m).
+
+```sh
+git clone https://github.com/Monofin/zigbee-bridge-rs.git
+cd zigbee-bridge-rs
+cp compose.env.example .env
+```
+
+Fill in `.env` with the source revision for the image tag (`git rev-parse --short HEAD`), the host user and group that own the state, the serial device and its group, and the radio’s existing network and serial settings. Set `STATE_DIR` and `CONFIG_DIR` to existing absolute directories outside the checkout. Put [broker.json](#broker-configuration) and any credential files in the config directory. The [installation guide](INSTALL.md#docker-compose) lists each setting.
+
+```sh
+docker compose config --quiet
+docker compose build bridge
+# Start after the previous coordinator has released the radio and state.
+docker compose up -d --no-build bridge
+docker compose logs --tail 50 -f bridge
+```
+
+Look for the verified coordinator and expected channel, then run the [MQTT health check](#use-it-from-mqtt-or-home-assistant). Press Ctrl-C to leave the log view. Use `docker compose stop bridge` for a graceful shutdown and `docker compose start bridge` to resume using the same state.
+
 ## Quickstart without hardware
 
 On Linux, use a C compiler/linker and a current stable Rust toolchain. The workspace has been tested with Rust 1.96. From a shell:
@@ -28,8 +50,6 @@ printf '%s\n' \
 ```
 
 The JSON output should contain `"finished": true` and endpoint `1`.
-
-For a container installation on Linux, use the [Docker Compose setup and service controls](INSTALL.md#docker-compose).
 
 ## Connect a coordinator
 
