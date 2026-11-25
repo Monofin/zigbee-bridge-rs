@@ -1,0 +1,13 @@
+**
+!Cargo.toml
+!Cargo.lock
+!src/
+!src/**
+!crates/
+!crates/**
+!LICENSE-*
+!THIRD-PARTY.md
+!tools/
+!tools/devices/
+!tools/devices/licenses/
+!tools/devices/licenses/**

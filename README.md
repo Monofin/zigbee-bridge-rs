@@ -29,6 +29,8 @@ printf '%s\n' \
 
 The JSON output should contain `"finished": true` and endpoint `1`.
 
+For a container installation on Linux, use the [Docker Compose setup and service controls](INSTALL.md#docker-compose).
+
 ## Connect a coordinator
 
 For a **new bench network**, follow the [formation and interview commands](REFERENCE.md#bench-coordinator) on a spare adapter. For an **existing Zigbee2MQTT network**, start with the [migration guide](MIGRATION.md) and the [supervised handover](INSTALL.md#side-by-side-trial-with-a-docker-based-z2m). Only one process can own the serial port at a time. Starting the bridge resets the adapter session.

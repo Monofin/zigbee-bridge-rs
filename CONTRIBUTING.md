@@ -25,6 +25,8 @@ The default suite uses temporary stores and simulated devices. Tests marked `ign
 cargo test --locked --test bridge_roundtrip --test mqtt_broker --test mqtt_discovery -- --ignored --test-threads=1
 ```
 
+For a packaging change, run `tools/packaging/test-compose.sh` on a Linux Docker host. It builds the image, opens a pseudo-terminal and checks graceful stop and restart with persistent state.
+
 These tests publish discovery and device state. Use a disposable broker for them. The [catalogue guide](tools/devices/README.md) describes source pins and reproduction of the catalogue. The [standards coverage guide](COVERAGE.md) describes generation checks for the ZCL tables.
 
 ## Reports and licensing

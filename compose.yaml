@@ -1,0 +1,40 @@
+services:
+  bridge:
+    build: .
+    image: "zigbee-bridge-local:${BRIDGE_TAG:?set BRIDGE_TAG to the source revision}"
+    pull_policy: never
+    user: "${BRIDGE_UID:?set the state owner UID}:${BRIDGE_GID:?set the state owner GID}"
+    group_add:
+      - "${SERIAL_GID:?set the serial device GID}"
+    devices:
+      - "${SERIAL_DEVICE:?set the serial device path}:/dev/zigbee:rw"
+    volumes:
+      - type: bind
+        source: "${STATE_DIR:?set an existing state directory}"
+        target: /state
+        bind:
+          create_host_path: false
+      - type: bind
+        source: "${CONFIG_DIR:?set an existing config directory}"
+        target: /config
+        read_only: true
+        bind:
+          create_host_path: false
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    restart: "${RESTART_POLICY:-on-failure:3}"
+    stop_grace_period: 60s
+    command:
+      - listen
+      - /dev/zigbee
+      - /state
+      - "${ZIGBEE_CHANNEL:?set the commissioned channel}"
+      - "${ZIGBEE_PAN:?set the commissioned hex PAN ID}"
+      - "${ZIGBEE_EXT_PAN:?set the commissioned hex extended PAN ID}"
+      - --baud
+      - "${SERIAL_BAUD:-115200}"
+      - --flow
+      - "${SERIAL_FLOW:?set none, xonxoff or rtscts}"
+      - --mqtt-config
+      - /config/broker.json
