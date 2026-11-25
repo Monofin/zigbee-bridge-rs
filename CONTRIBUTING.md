@@ -14,7 +14,10 @@ Contributions to the bridge, reusable crates, documentation and device profiles 
 
 ```sh
 cargo test --locked --workspace --all-targets
+cargo deny --locked --all-features check
 ```
+
+GitHub Actions builds the release binaries and runs the workspace, broker-backed tests and dependency checks on pull requests and pushes to main. Install cargo-deny with `cargo install --locked cargo-deny` to run the policy locally. A dependency that needs a new licence requires review. The MPL-2.0 exception applies to `serialport`. [Distribution notes](THIRD-PARTY.md)
 
 The default suite uses temporary stores and simulated devices. Tests marked `ignored` have additional prerequisites. To exercise the MQTT and serial integrations, run an isolated Mosquitto broker on loopback port 1883 and use the following command in its network namespace:
 

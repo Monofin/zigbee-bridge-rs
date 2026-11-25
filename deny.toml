@@ -1,0 +1,8 @@
+[licenses]
+allow = ["MIT", "Apache-2.0", "BSD-3-Clause", "ISC", "Unicode-3.0"]
+# The covered serial library carries source-availability obligations for binary releases.
+exceptions = [{ crate = "serialport", allow = ["MPL-2.0"] }]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
