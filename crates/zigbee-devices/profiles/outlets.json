@@ -1,0 +1,10 @@
+[
+  {"kind":"outlet","manufacturer":"IKEA of Sweden","model":"TRADFRI control outlet","profile":260,"device_type":266,"endpoint":1,"servers":[0,6],"source":"ikea.ts#E160x/E170x/E190x"},
+  {"kind":"outlet","manufacturer":"IKEA of Sweden","model":"INSPELNING Smart plug","profile":260,"device_type":266,"endpoint":1,"servers":[0,6,1794,2820],"source":"ikea.ts#E22xx","meter":"standard"},
+  {"inching":true,"kind":"relay","manufacturer":"SONOFF","model":"ZBMINIR2","profile":260,"device_type":2,"endpoint":1,"servers":[0,6,64529],"source":"sonoff.ts#ZBMINIR2"},
+  {"inching":true,"kind":"relay","manufacturer":"SONOFF","model":"MINI-ZBD","profile":260,"device_type":2,"endpoint":1,"servers":[0,6,64529],"source":"sonoff.ts#ZBMINIR2"},
+  {"inching":true,"kind":"outlet","manufacturer":"SONOFF","model":"S60ZBTPG","profile":260,"device_type":81,"endpoint":1,"servers":[0,6,1794,64529],"source":"sonoff.ts#S60ZBTPG","meter":"sonoff"},
+  {"kind":"valve","manufacturer":"SONOFF","model":"SWV","profile":260,"device_type":2,"endpoint":1,"servers":[0,6,1028,64529],"source":"sonoff.ts#SWV"},
+  {"kind":"relay","manufacturer":"_TZ3000_o4cjetlm","model":"TS0001","profile":260,"device_type":256,"endpoint":1,"servers":[0,6,57344,57345],"source":"tuya.ts#ZN231392"},
+  {"kind":"outlet","manufacturer":"innr","model":"SP 120","profile":49246,"device_type":16,"endpoint":1,"servers":[0,6,1794,2820],"source":"innr.ts#SP 120","meter":"innr"}
+]

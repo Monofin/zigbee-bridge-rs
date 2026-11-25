@@ -1,0 +1,300 @@
+[
+  {
+    "manufacturer": "3A Smart Home DE",
+    "model": "LXT56-LS27LX1.7",
+    "endpoint": 1,
+    "device_type": 269,
+    "identify": false,
+    "startup_mireds": [
+      150,
+      500
+    ],
+    "effects": "colorloop"
+  },
+  {
+    "manufacturer": "GLEDOPTO",
+    "model": "GL-C-008P",
+    "endpoint": 11,
+    "device_type": 269,
+    "identify": true,
+    "startup_mireds": [
+      158,
+      500
+    ],
+    "effects": "colorloop"
+  },
+  {
+    "manufacturer": "GLEDOPTO",
+    "model": "GL-FL-006P",
+    "endpoint": 11,
+    "device_type": 269,
+    "identify": false,
+    "startup_mireds": [
+      158,
+      495
+    ],
+    "effects": "colorloop"
+  },
+  {
+    "manufacturer": "IKEA of Sweden",
+    "model": "INSPELNING Smart plug",
+    "endpoint": 1,
+    "device_type": 266,
+    "identify": true
+  },
+  {
+    "manufacturer": "IKEA of Sweden",
+    "model": "SILVERGLANS IP44 LED driver",
+    "endpoint": 1,
+    "device_type": 257,
+    "identify": true,
+    "effects": "identify",
+    "level_config": true
+  },
+  {
+    "manufacturer": "IKEA of Sweden",
+    "model": "SOMRIG shortcut button",
+    "endpoint": 1,
+    "device_type": 6,
+    "identify": true
+  },
+  {
+    "manufacturer": "IKEA of Sweden",
+    "model": "TRADFRI bulb E14 W op/ch 400lm",
+    "endpoint": 1,
+    "device_type": 257,
+    "identify": true,
+    "effects": "identify",
+    "level_config": true
+  },
+  {
+    "manufacturer": "IKEA of Sweden",
+    "model": "TRADFRI bulb E14 WS 470lm",
+    "endpoint": 1,
+    "device_type": 268,
+    "identify": true,
+    "startup_mireds": [
+      250,
+      454
+    ],
+    "effects": "identify",
+    "level_config": true
+  },
+  {
+    "manufacturer": "IKEA of Sweden",
+    "model": "TRADFRI bulb E27 CWS 806lm",
+    "endpoint": 1,
+    "device_type": 269,
+    "identify": true,
+    "startup_mireds": [
+      250,
+      454
+    ],
+    "effects": "colorloop",
+    "level_config": true
+  },
+  {
+    "manufacturer": "IKEA of Sweden",
+    "model": "TRADFRI bulb E27 CWS opal 600lm",
+    "endpoint": 1,
+    "device_type": 258,
+    "identify": true,
+    "startup_mireds": [
+      153,
+      500
+    ],
+    "effects": "colorloop",
+    "level_config": true,
+    "temperature_via_xy": [
+      153,
+      500
+    ]
+  },
+  {
+    "manufacturer": "IKEA of Sweden",
+    "model": "TRADFRI bulb E27 WW G95 CL 470lm",
+    "endpoint": 1,
+    "device_type": 257,
+    "identify": true,
+    "effects": "identify",
+    "level_config": true
+  },
+  {
+    "manufacturer": "IKEA of Sweden",
+    "model": "TRADFRI bulb E27 WW clear 250lm",
+    "endpoint": 1,
+    "device_type": 257,
+    "identify": true,
+    "effects": "identify",
+    "level_config": true
+  },
+  {
+    "manufacturer": "IKEA of Sweden",
+    "model": "TRADFRI control outlet",
+    "endpoint": 1,
+    "device_type": 266,
+    "identify": true
+  },
+  {
+    "manufacturer": "IKEA of Sweden",
+    "model": "TRADFRI motion sensor",
+    "endpoint": 1,
+    "device_type": 2128,
+    "identify": true
+  },
+  {
+    "manufacturer": "IKEA of Sweden",
+    "model": "TRADFRI on/off switch",
+    "endpoint": 1,
+    "device_type": 2080,
+    "identify": true
+  },
+  {
+    "manufacturer": "IKEA of Sweden",
+    "model": "TRADFRI remote control",
+    "endpoint": 1,
+    "device_type": 2080,
+    "identify": true
+  },
+  {
+    "manufacturer": "IKEA of Sweden",
+    "model": "TRADFRIbulbB22WSglobeopal1055lm",
+    "endpoint": 1,
+    "device_type": 268,
+    "identify": true,
+    "startup_mireds": [
+      250,
+      454
+    ],
+    "effects": "identify",
+    "level_config": true
+  },
+  {
+    "manufacturer": "IKEA of Sweden",
+    "model": "TRADFRIbulbE14WWclear250lm",
+    "endpoint": 1,
+    "device_type": 257,
+    "identify": true,
+    "effects": "identify",
+    "level_config": true
+  },
+  {
+    "manufacturer": "IKEA of Sweden",
+    "model": "TRADFRIbulbE27WSglobeclear806lm",
+    "endpoint": 1,
+    "device_type": 268,
+    "identify": true,
+    "startup_mireds": [
+      250,
+      454
+    ],
+    "effects": "identify",
+    "level_config": true
+  },
+  {
+    "manufacturer": "IKEA of Sweden",
+    "model": "TRADFRIbulbG125E27WSopal470lm",
+    "endpoint": 1,
+    "device_type": 268,
+    "identify": true,
+    "startup_mireds": [
+      250,
+      454
+    ],
+    "effects": "identify",
+    "level_config": true
+  },
+  {
+    "manufacturer": "IKEA of Sweden",
+    "model": "VALLHORN Wireless Motion Sensor",
+    "endpoint": 1,
+    "device_type": 2128,
+    "identify": true
+  },
+  {
+    "manufacturer": "Signify Netherlands B.V.",
+    "model": "LTA006",
+    "endpoint": 11,
+    "device_type": 268,
+    "identify": true,
+    "startup_mireds": [
+      222,
+      454
+    ],
+    "hue_effects": true
+  },
+  {
+    "manufacturer": "Signify Netherlands B.V.",
+    "model": "LWA001",
+    "endpoint": 11,
+    "device_type": 257,
+    "identify": true,
+    "hue_effects": true
+  },
+  {
+    "manufacturer": "Signify Netherlands B.V.",
+    "model": "LWE002",
+    "endpoint": 11,
+    "device_type": 257,
+    "identify": true,
+    "hue_effects": true
+  },
+  {
+    "manufacturer": "Signify Netherlands B.V.",
+    "model": "LWE004",
+    "endpoint": 11,
+    "device_type": 257,
+    "identify": true,
+    "hue_effects": true
+  },
+  {
+    "manufacturer": "Signify Netherlands B.V.",
+    "model": "SML004",
+    "endpoint": 2,
+    "device_type": 263,
+    "identify": true
+  },
+  {
+    "manufacturer": "innr",
+    "model": "BF 265",
+    "device_type": 257,
+    "endpoint": 1,
+    "identify": false,
+    "effects": "identify"
+  },
+  {
+    "manufacturer": "_TZ3210_onejz0gt",
+    "model": "TS0504B",
+    "device_type": 269,
+    "endpoint": 1,
+    "identify": false,
+    "effects": "colorloop",
+    "tuya_lamp": "colour"
+  },
+  {
+    "manufacturer": "_TZ3210_fovydm9k",
+    "model": "TS0501B",
+    "device_type": 257,
+    "endpoint": 1,
+    "identify": false,
+    "effects": "identify",
+    "tuya_lamp": "white"
+  },
+  {
+    "manufacturer": "_TZ3210_3lbtuxgp",
+    "model": "TS0505B",
+    "device_type": 269,
+    "endpoint": 1,
+    "identify": false,
+    "effects": "colorloop",
+    "tuya_lamp": "colour"
+  },
+  {
+    "manufacturer": "innr",
+    "model": "BF 263",
+    "device_type": 257,
+    "endpoint": 1,
+    "identify": false,
+    "effects": "identify"
+  }
+]

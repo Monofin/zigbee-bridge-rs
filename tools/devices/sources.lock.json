@@ -1,0 +1,26 @@
+[
+  {
+    "source": "zha",
+    "repository": "https://github.com/zigpy/zha-device-handlers",
+    "revision": "b07fa76876e081d48744968f9fb806e7f1fee0ee",
+    "license": "Apache-2.0",
+    "records": 1449,
+    "jsonl_sha256": "7113a3fd240540b667348410081b3d33f0d57735cede9ff06b7016cac0e577e5"
+  },
+  {
+    "source": "deconz",
+    "repository": "https://github.com/dresden-elektronik/deconz-rest-plugin",
+    "revision": "c24e81cf01c121583887acea24e647c3496ebd9a",
+    "license": "BSD-3-Clause",
+    "records": 1113,
+    "jsonl_sha256": "f2ddbe31727465599cc873e5cdfd057147eca4d20a42a10546a5ee8e6b3c3eed"
+  },
+  {
+    "source": "z2m",
+    "repository": "https://github.com/Koenkk/zigbee-herdsman-converters",
+    "revision": "ed29f80014f11cd3234e0e7371d1aace44e08982",
+    "license": "MIT",
+    "records": 4690,
+    "jsonl_sha256": "0d16b079e1a3417fed65fcedf7827e66c50a223e6f3cf8694ca2f7d5e8e7b738"
+  }
+]

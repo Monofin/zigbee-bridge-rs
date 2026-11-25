@@ -1,0 +1,7 @@
+[
+  {"manufacturer":"IKEA of Sweden","model":"VALLHORN Wireless Motion Sensor","endpoint":1,"voltage":true},
+  {"manufacturer":"TUYATEC-b5g40alm","model":"RH3040","endpoint":1,"voltage":false},
+  {"manufacturer":"TUYATEC-zn9wyqtr","model":"RH3040","endpoint":1,"voltage":false},
+  {"manufacturer":"_TZ3000_lqpt3mvr","model":"TS0210","endpoint":1,"voltage":true},
+  {"manufacturer":"_TZ3000_otvn3lne","model":"TS0202","endpoint":1,"voltage":true}
+]

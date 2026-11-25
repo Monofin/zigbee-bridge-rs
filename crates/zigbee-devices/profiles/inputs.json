@@ -1,0 +1,18 @@
+[
+  ["ias_motion","TUYATEC-zn9wyqtr","RH3040",1,1026,[0,1,1280],[]],
+  ["ias_motion","TUYATEC-b5g40alm","RH3040",1,1026,[0,1,1280],[]],
+  ["ias_motion_reports","_TZ3000_otvn3lne","TS0202",1,1026,[0,1,1280],[]],
+  ["ias_vibration","_TZ3000_lqpt3mvr","TS0210",1,1026,[0,1,1280],[]],
+  ["standard_motion","Signify Netherlands B.V.","SML004",2,263,[0,1024,1030],[]],
+  ["standard_motion","IKEA of Sweden","VALLHORN Wireless Motion Sensor",2,263,[0,1030],[]],
+  ["standard_motion","IKEA of Sweden","VALLHORN Wireless Motion Sensor",3,263,[0,1030],[],{"illuminance":true}],
+  ["timed_motion","IKEA of Sweden","TRADFRI motion sensor",1,2128,[0,1],[6,8]],
+  ["lumi_motion","LUMI","lumi.motion.ac02",1,263,[0,64704],[]],
+  ["sonoff_relay","SONOFF","MINI-ZBD",1,2,[0,6,64529],[6]],
+  ["sonoff_relay","SONOFF","ZBMINIR2",1,2,[0,6,64529],[6]],
+  ["ewelink","eWeLink","SNZB-01P",1,0,[0,1],[6]],
+  ["ikea_switch","IKEA of Sweden","TRADFRI on/off switch",1,2080,[0,1],[6,8]],
+  ["ikea_remote","IKEA of Sweden","TRADFRI remote control",1,2080,[0,1],[5,6,8]],
+  ["somrig","IKEA of Sweden","SOMRIG shortcut button",1,6,[0,64640],[64640]],
+  ["somrig","IKEA of Sweden","SOMRIG shortcut button",2,6,[0,64640],[64640]]
+]

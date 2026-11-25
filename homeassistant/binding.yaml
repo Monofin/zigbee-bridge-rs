@@ -1,0 +1,80 @@
+blueprint:
+  name: Zigbee bridge binding
+  description: Bind or unbind one cluster on a source device. The bridge reports the result on the Maintenance page.
+  domain: script
+  input:
+    api_sensor:
+      name: Bridge admin API sensor
+      selector:
+        entity:
+          filter:
+            - domain: sensor
+              integration: mqtt
+fields:
+  operation:
+    name: Operation
+    required: true
+    default: bind
+    selector:
+      select:
+        options: [bind, unbind]
+  source:
+    name: Source device
+    required: true
+    selector:
+      device:
+        filter: [{integration: mqtt}]
+  destination:
+    name: Destination device
+    description: Leave empty to use the coordinator.
+    selector:
+      device:
+        filter: [{integration: mqtt}]
+  cluster:
+    name: Cluster
+    description: Enter a cluster name or hexadecimal ID, such as genOnOff or 0x0006.
+    required: true
+    selector:
+      text:
+  source_endpoint:
+    name: Source endpoint
+    description: Leave empty for the device default.
+    selector: &endpoint
+      number: {min: 1, max: 240, mode: box}
+  destination_endpoint:
+    name: Destination endpoint
+    selector: *endpoint
+mode: single
+sequence:
+  - variables:
+      api: !input api_sensor
+      base: "{{ state_attr(api, 'mqtt_base') }}"
+      source_ieee: >-
+        {{ device_attr(source, 'identifiers') | default([], true)
+           | selectattr('0', 'eq', 'mqtt') | map(attribute='1')
+           | select('match', '^zigbee2mqtt_0x[0-9a-f]{16}$') | map('replace', 'zigbee2mqtt_', '') | first | default('') }}
+      target_ieee: >-
+        {% if destination | default('') %}
+          {{ device_attr(destination, 'identifiers') | default([], true)
+             | selectattr('0', 'eq', 'mqtt') | map(attribute='1')
+             | select('match', '^zigbee2mqtt_0x[0-9a-f]{16}$') | map('replace', 'zigbee2mqtt_', '') | first | default('') }}
+        {% else %}Coordinator{% endif %}
+  - if: "{{ not is_state(api, '1') or not base or operation not in ['bind', 'unbind'] or not source_ieee or not target_ieee or not cluster | trim }}"
+    then:
+      - stop: Select devices on this bridge and check that admin API v1 is online.
+        error: true
+  - action: mqtt.publish
+    data:
+      topic: "{{ base }}/bridge/v1/request/device/{{ operation }}"
+      qos: 1
+      retain: false
+      payload: >-
+        {% set request = dict(from=source_ieee, to=target_ieee, clusters=[cluster | trim],
+                              transaction='ha-' ~ now().isoformat()) %}
+        {% if source_endpoint is defined and source_endpoint is not none %}
+          {% set request = dict(request, from_endpoint=source_endpoint | int) %}
+        {% endif %}
+        {% if destination_endpoint is defined and destination_endpoint is not none %}
+          {% set request = dict(request, to_endpoint=destination_endpoint | int) %}
+        {% endif %}
+        {{ request | to_json }}

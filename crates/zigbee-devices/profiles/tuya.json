@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "source": "https://github.com/Koenkk/zigbee-herdsman-converters/blob/ed29f80014f11cd3234e0e7371d1aace44e08982/src/devices/tuya.ts#L17138-L17263",
+  "profiles": [
+    {
+      "fingerprint": {
+        "manufacturer": "_TZE204_qasjif9e",
+        "model": "TS0601",
+        "endpoint": 1,
+        "profile": 260,
+        "servers": [
+          61184
+        ]
+      },
+      "mappings": [
+        {
+          "dp": 104,
+          "feature": "illuminance",
+          "codec": "value_u32_be"
+        }
+      ]
+    },
+    {
+      "fingerprint": {
+        "manufacturer": "_TZE204_laokfqwu",
+        "model": "TS0601",
+        "endpoint": 1,
+        "profile": 260,
+        "servers": [
+          61184
+        ]
+      },
+      "mappings": [
+        {
+          "dp": 103,
+          "feature": "illuminance",
+          "codec": "value_u32_be"
+        },
+        {
+          "dp": 104,
+          "feature": "interval_time",
+          "codec": "value_u32_be",
+          "write_range": [
+            1,
+            3600
+          ]
+        }
+      ]
+    }
+  ]
+}

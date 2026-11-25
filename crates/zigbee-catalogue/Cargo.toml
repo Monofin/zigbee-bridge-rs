@@ -1,0 +1,15 @@
+[package]
+name = "zigbee-catalogue"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.90"
+license.workspace = true
+publish = false
+description = "Offline provenance index for upstream Zigbee device descriptions"
+
+[dependencies]
+anyhow = "1"
+redb = "=5.0.0"
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["raw_value"] }
+tempfile = "3"

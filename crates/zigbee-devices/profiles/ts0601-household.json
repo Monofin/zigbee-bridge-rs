@@ -1,0 +1,50 @@
+{
+  "reference": "zigbee-herdsman-converters@ed29f80014f11cd3234e0e7371d1aace44e08982",
+  "service_sets": {
+    "tuya_base_dp": ["basic_setup", "alternate_reports", "gateway_status", "mcu_version"]
+  },
+  "manufacturers": {
+    "_TZE200_rddyvrci": {"family":"cover","time_epoch":"unix","close":1,"open":2,"stop":0},
+    "_TZE200_cowvfni3": {"family":"cover","time_epoch":"unix","close":0,"open":2,"stop":1},
+    "_TZE284_oitavov2": {"family":"soil","service_set":"tuya_base_dp"},
+    "_TZE204_qasjif9e": {"family":"radar","service_set":"tuya_base_dp"},
+    "_TZE200_gbagoilo": {"family":"metered_switch","service_set":"tuya_base_dp"},
+    "_TZE284_xnwxmj8z": {"family":"metered_switch","service_set":"tuya_base_dp"},
+    "_TZE284_lq0ffndf": {"family":"double_socket","service_set":"tuya_base_dp"}
+  },
+  "soil": [
+    {"dp":3,"key":"soil_moisture","max":100},
+    {"dp":5,"key":"temperature","signed":true},
+    {"dp":9,"key":"temperature_unit","choices":["celsius","fahrenheit"],"writable":true},
+    {"dp":14,"key":"battery_state","choices":["low","medium","high"]},
+    {"dp":15,"key":"battery","max":100}
+  ],
+  "radar": [
+    {"dp":1,"key":"presence","boolean":true},
+    {"dp":9,"key":"target_distance","scale":100},
+    {"dp":12,"key":"illuminance"},
+    {"dp":104,"key":"illuminance"},
+    {"dp":2,"key":"radar_sensitivity","max":9,"writable":true,"step":1},
+    {"dp":4,"key":"maximum_range","scale":100,"max":9.5,"step":0.15,"writable":true},
+    {"dp":3,"key":"minimum_range","scale":100,"max":9.5,"step":0.15,"writable":true},
+    {"dp":102,"key":"fading_time","scale":10,"min":0.5,"max":1500,"step":1,"writable":true},
+    {"dp":101,"key":"detection_delay","scale":10,"max":10,"step":0.1,"writable":true}
+  ],
+  "metered": [
+    {"dp":14,"key":"power_on_behavior","choices":["off","on","previous"],"writable":true},
+    {"dp":16,"key":"backlight_mode","switch":["OFF","ON"],"writable":true},
+    {"dp":21,"key":"current","signed":true,"scale":1000},
+    {"dp":22,"key":"power","signed":true,"scale":10},
+    {"dp":23,"key":"voltage","signed":true,"scale":10}
+  ],
+  "metered_switch": [
+    {"dp":1,"key":"state","switch":["OFF","ON"],"writable":true},
+    {"dp":7,"key":"countdown","max":43200,"step":1,"writable":true}
+  ],
+  "double_socket": [
+    {"dp":1,"key":"state_left","switch":["OFF","ON"],"writable":true},
+    {"dp":2,"key":"state_right","switch":["OFF","ON"],"writable":true},
+    {"dp":20,"key":"energy","signed":true,"scale":1000},
+    {"dp":101,"key":"child_lock","switch":["UNLOCK","LOCK"],"writable":true}
+  ]
+}

@@ -1,0 +1,995 @@
+{
+  "fields": {
+    "comfort_temperature_max": {
+      "cluster": 64529,
+      "attribute": 3,
+      "type": 41,
+      "scale": 100,
+      "min": -10,
+      "max": 60,
+      "step": 0.1,
+      "unit": "°C"
+    },
+    "comfort_temperature_min": {
+      "cluster": 64529,
+      "attribute": 4,
+      "type": 41,
+      "scale": 100,
+      "min": -10,
+      "max": 60,
+      "step": 0.1,
+      "unit": "°C"
+    },
+    "comfort_humidity_min": {
+      "cluster": 64529,
+      "attribute": 5,
+      "type": 33,
+      "scale": 100,
+      "min": 5,
+      "max": 95,
+      "step": 0.1,
+      "unit": "%"
+    },
+    "comfort_humidity_max": {
+      "cluster": 64529,
+      "attribute": 6,
+      "type": 33,
+      "scale": 100,
+      "min": 5,
+      "max": 95,
+      "step": 0.1,
+      "unit": "%"
+    },
+    "temperature_calibration": {
+      "cluster": 64529,
+      "attribute": 8195,
+      "type": 41,
+      "scale": 100,
+      "min": -50,
+      "max": 50,
+      "step": 0.1,
+      "unit": "°C"
+    },
+    "humidity_calibration": {
+      "cluster": 64529,
+      "attribute": 8196,
+      "type": 41,
+      "scale": 100,
+      "min": -50,
+      "max": 50,
+      "step": 0.1,
+      "unit": "%"
+    },
+    "temperature_units": {
+      "cluster": 64529,
+      "attribute": 7,
+      "type": 33,
+      "choices": [
+        "celsius",
+        "fahrenheit"
+      ],
+      "codes": [
+        0,
+        1
+      ]
+    },
+    "power_on_behavior": {
+      "cluster": 6,
+      "attribute": 16387,
+      "type": 48,
+      "choices": [
+        "off",
+        "on",
+        "toggle",
+        "previous"
+      ],
+      "codes": [
+        0,
+        1,
+        2,
+        255
+      ]
+    },
+    "energy_today": {
+      "device_class": "energy",
+      "state_class": "total_increasing",
+      "cluster": 64529,
+      "attribute": 28681,
+      "type": 35,
+      "access": 5,
+      "scale": 1000,
+      "unit": "kWh"
+    },
+    "energy_month": {
+      "device_class": "energy",
+      "state_class": "total_increasing",
+      "cluster": 64529,
+      "attribute": 28682,
+      "type": 35,
+      "access": 5,
+      "scale": 1000,
+      "unit": "kWh"
+    },
+    "energy_yesterday": {
+      "device_class": "energy",
+      "cluster": 64529,
+      "attribute": 28683,
+      "type": 35,
+      "access": 5,
+      "scale": 1000,
+      "unit": "kWh"
+    },
+    "network_indicator": {
+      "cluster": 64529,
+      "attribute": 1,
+      "type": 16,
+      "access": 7,
+      "boolean": true
+    },
+    "outlet_control_protect": {
+      "cluster": 64529,
+      "attribute": 28679,
+      "type": 32,
+      "access": 7,
+      "boolean": true
+    },
+    "real_time_irrigation_duration": {
+      "device_class": "duration",
+      "cluster": 64529,
+      "attribute": 20486,
+      "type": 35,
+      "access": 1,
+      "scale": 1,
+      "unit": "s"
+    },
+    "real_time_irrigation_volume": {
+      "device_class": "volume",
+      "cluster": 64529,
+      "attribute": 20487,
+      "type": 35,
+      "access": 1,
+      "scale": 1,
+      "unit": "L"
+    },
+    "irrigation_start_time": {
+      "cluster": 64529,
+      "attribute": 20493,
+      "type": 35,
+      "access": 1,
+      "scale": 1,
+      "unit": null
+    },
+    "irrigation_end_time": {
+      "cluster": 64529,
+      "attribute": 20494,
+      "type": 35,
+      "access": 1,
+      "scale": 1,
+      "unit": null
+    },
+    "daily_irrigation_volume": {
+      "device_class": "water",
+      "state_class": "total_increasing",
+      "cluster": 64529,
+      "attribute": 20495,
+      "type": 35,
+      "access": 1,
+      "scale": 1,
+      "unit": "L"
+    },
+    "flow": {
+      "device_class": "volume_flow_rate",
+      "state_class": "measurement",
+      "cluster": 1028,
+      "attribute": 0,
+      "type": 33,
+      "access": 1,
+      "scale": 10,
+      "unit": "m³/h",
+      "invalid": 65535
+    },
+    "current_device_status": {
+      "cluster": 64529,
+      "attribute": 20492,
+      "type": 32,
+      "access": 5,
+      "choices": [
+        "normal_state",
+        "water_shortage",
+        "water_leakage",
+        "water_shortage & water_leakage"
+      ],
+      "codes": [
+        0,
+        1,
+        2,
+        3
+      ]
+    },
+    "cyclic_timed_irrigation": {
+      "cluster": 64529,
+      "attribute": 20488,
+      "type": 66,
+      "cycle": "timed"
+    },
+    "cyclic_quantitative_irrigation": {
+      "cluster": 64529,
+      "attribute": 20489,
+      "type": 66,
+      "cycle": "quantitative"
+    },
+    "overload_protection": {
+      "cluster": 64529,
+      "attribute": 28675,
+      "type": 66,
+      "overload_limits": {"power": 3250, "current": 14}
+    },
+    "auto_close_when_water_shortage": {
+      "cluster": 64529,
+      "attribute": 20497,
+      "type": 33,
+      "string_binary": true,
+      "choices": [
+        "DISABLE",
+        "ENABLE"
+      ],
+      "codes": [
+        0,
+        30
+      ]
+    },
+    "valve_work_state": {
+      "string_binary": true,
+      "cluster": 64529,
+      "attribute": 20496,
+      "type": 16,
+      "access": 1,
+      "choices": [
+        "idle",
+        "working"
+      ],
+      "codes": [
+        0,
+        1
+      ]
+    },
+    "tuya_startup": {
+      "property": "power_on_behavior",
+      "cluster": 6,
+      "attribute": 32770,
+      "type": 48,
+      "choices": [
+        "off",
+        "on",
+        "previous"
+      ],
+      "codes": [
+        0,
+        1,
+        2
+      ]
+    },
+    "delayed_power_on_state": {
+      "cluster": 64529,
+      "attribute": 20,
+      "type": 16,
+      "boolean": true
+    },
+    "delayed_power_on_time": {
+      "cluster": 64529,
+      "attribute": 21,
+      "type": 33,
+      "scale": 2,
+      "min": 0.5,
+      "max": 3599.5,
+      "step": 0.5,
+      "unit": "seconds"
+    },
+    "external_trigger_mode": {
+      "cluster": 64529,
+      "attribute": 22,
+      "type": 32,
+      "choices": [
+        "edge",
+        "pulse",
+        "following(off)",
+        "following(on)"
+      ],
+      "codes": [
+        0,
+        1,
+        2,
+        130
+      ]
+    },
+    "detach_relay_mode": {
+      "cluster": 64529,
+      "attribute": 23,
+      "type": 16,
+      "boolean": true
+    },
+    "turbo_mode": {
+      "cluster": 64529,
+      "attribute": 18,
+      "type": 41,
+      "boolean": true,
+      "codes": [
+        9,
+        20
+      ]
+    },
+    "color_options": {
+      "cluster": 768,
+      "attribute": 15,
+      "type": 24,
+      "bitmap_member": "execute_if_off"
+    },
+    "ikea_child_lock": {
+      "cluster": 64645,
+      "attribute": 0,
+      "type": 16,
+      "property": "child_lock",
+      "string_binary": true,
+      "choices": [
+        "UNLOCK",
+        "LOCK"
+      ],
+      "codes": [
+        0,
+        1
+      ],
+      "manufacturer_code": 4476
+    },
+    "ikea_led_enable": {
+      "cluster": 64645,
+      "attribute": 1,
+      "type": 16,
+      "property": "led_enable",
+      "string_binary": true,
+      "choices": [
+        "FALSE",
+        "TRUE"
+      ],
+      "codes": [
+        0,
+        1
+      ],
+      "manufacturer_code": 4476
+    },
+    "lux_value": {
+      "cluster": 64641,
+      "attribute": 0,
+      "type": 16,
+      "choices": [
+        "always",
+        "only_when_dark"
+      ],
+      "codes": [
+        0,
+        1
+      ],
+      "manufacturer_code": 4476
+    },
+    "timer": {
+      "cluster": 64641,
+      "attribute": 2,
+      "type": 33,
+      "min": 10,
+      "max": 65534,
+      "step": 10,
+      "scale": 1,
+      "unit": "s",
+      "manufacturer_code": 4476
+    },
+    "hue_motion_sensitivity": {
+      "cluster": 1030,
+      "attribute": 48,
+      "type": 32,
+      "property": "motion_sensitivity",
+      "choices": [
+        "low",
+        "medium",
+        "high",
+        "very_high",
+        "max"
+      ],
+      "codes": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "manufacturer_code": 4107
+    },
+    "led_indication": {
+      "cluster": 0,
+      "attribute": 51,
+      "type": 16,
+      "boolean": true,
+      "manufacturer_code": 4107
+    },
+    "occupancy_timeout": {
+      "cluster": 1030,
+      "attribute": 16,
+      "type": 33,
+      "min": 0,
+      "max": 65534,
+      "step": 1,
+      "scale": 1,
+      "unit": "s"
+    },
+    "lumi_motion_sensitivity": {
+      "cluster": 64704,
+      "attribute": 268,
+      "type": 32,
+      "property": "motion_sensitivity",
+      "choices": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "codes": [
+        1,
+        2,
+        3
+      ],
+      "manufacturer_code": 4447
+    },
+    "trigger_indicator": {
+      "cluster": 64704,
+      "attribute": 338,
+      "type": 32,
+      "boolean": true,
+      "manufacturer_code": 4447
+    },
+    "detection_interval": {
+      "cluster": 64704,
+      "attribute": 258,
+      "type": 32,
+      "min": 2,
+      "max": 255,
+      "step": 1,
+      "scale": 1,
+      "unit": "s",
+      "manufacturer_code": 4447
+    },
+    "indicator_mode": {
+      "cluster": 6,
+      "attribute": 32769,
+      "type": 48,
+      "choices": [
+        "off",
+        "off/on",
+        "on/off",
+        "on"
+      ],
+      "codes": [
+        0,
+        1,
+        2,
+        3
+      ]
+    },
+    "sensitivity": {
+      "cluster": 1280,
+      "attribute": 19,
+      "type": 32,
+      "access": 3,
+      "min": 0,
+      "max": 50,
+      "step": 1,
+      "scale": 1
+    }
+  },
+  "products": [
+    {
+      "manufacturer": "SONOFF",
+      "model": "SNZB-02D",
+      "device_type": 770,
+      "servers": [
+        0,
+        1,
+        1026,
+        1029,
+        64529
+      ],
+      "fields": [
+        "comfort_temperature_max",
+        "comfort_temperature_min",
+        "comfort_humidity_min",
+        "comfort_humidity_max",
+        "temperature_calibration",
+        "humidity_calibration",
+        "temperature_units"
+      ]
+    },
+    {
+      "manufacturer": "SONOFF",
+      "model": "SNZB-02LD",
+      "device_type": 770,
+      "servers": [
+        0,
+        1,
+        1026,
+        64529
+      ],
+      "fields": [
+        "temperature_calibration",
+        "temperature_units"
+      ]
+    },
+    {
+      "manufacturer": "eWeLink",
+      "model": "SNZB-02P",
+      "device_type": 770,
+      "servers": [
+        0,
+        1,
+        1026,
+        1029,
+        64529
+      ],
+      "fields": [
+        "temperature_calibration",
+        "humidity_calibration"
+      ]
+    },
+    {
+      "manufacturer": "IKEA of Sweden",
+      "model": "TRADFRI control outlet",
+      "device_type": 266,
+      "servers": [
+        0,
+        6
+      ],
+      "fields": [
+        "power_on_behavior"
+      ]
+    },
+    {
+      "manufacturer": "IKEA of Sweden",
+      "model": "INSPELNING Smart plug",
+      "device_type": 266,
+      "servers": [
+        0,
+        6,
+        1794,
+        2820
+      ],
+      "fields": [
+        "power_on_behavior",
+        "ikea_child_lock",
+        "ikea_led_enable"
+      ]
+    },
+    {
+      "manufacturer": "SONOFF",
+      "model": "S60ZBTPG",
+      "device_type": 81,
+      "servers": [
+        0,
+        6,
+        64529
+      ],
+      "fields": [
+        "power_on_behavior",
+        "energy_today",
+        "energy_month",
+        "energy_yesterday",
+        "network_indicator",
+        "overload_protection",
+        "outlet_control_protect"
+      ]
+    },
+    {
+      "manufacturer": "SONOFF",
+      "model": "ZBMINIR2",
+      "device_type": 2,
+      "servers": [
+        0,
+        6,
+        64529
+      ],
+      "fields": [
+        "power_on_behavior",
+        "network_indicator",
+        "delayed_power_on_state",
+        "delayed_power_on_time",
+        "external_trigger_mode",
+        "detach_relay_mode",
+        "turbo_mode"
+      ]
+    },
+    {
+      "manufacturer": "SONOFF",
+      "model": "MINI-ZBD",
+      "device_type": 2,
+      "servers": [
+        0,
+        6,
+        64529
+      ],
+      "fields": [
+        "power_on_behavior",
+        "network_indicator",
+        "delayed_power_on_state",
+        "delayed_power_on_time",
+        "external_trigger_mode",
+        "detach_relay_mode",
+        "turbo_mode"
+      ]
+    },
+    {
+      "manufacturer": "SONOFF",
+      "model": "SWV",
+      "device_type": 2,
+      "servers": [
+        0,
+        6,
+        1028,
+        64529
+      ],
+      "fields": [
+        "real_time_irrigation_duration",
+        "real_time_irrigation_volume",
+        "irrigation_start_time",
+        "irrigation_end_time",
+        "daily_irrigation_volume",
+        "flow",
+        "current_device_status",
+        "auto_close_when_water_shortage",
+        "cyclic_timed_irrigation",
+        "cyclic_quantitative_irrigation",
+        "valve_work_state"
+      ]
+    },
+    {
+      "manufacturer": "_TZ3000_o4cjetlm",
+      "model": "TS0001",
+      "device_type": 256,
+      "servers": [
+        0,
+        6,
+        57344,
+        57345
+      ],
+      "fields": [
+        "tuya_startup",
+        "indicator_mode"
+      ]
+    },
+    {
+      "manufacturer": "3A Smart Home DE",
+      "model": "LXT56-LS27LX1.7",
+      "endpoint": 1,
+      "device_type": 269,
+      "servers": [
+        0,
+        6,
+        8
+      ],
+      "fields": [
+        "power_on_behavior"
+      ]
+    },
+    {
+      "manufacturer": "GLEDOPTO",
+      "model": "GL-C-008P",
+      "endpoint": 11,
+      "device_type": 269,
+      "servers": [
+        0,
+        6,
+        8
+      ],
+      "fields": [
+        "power_on_behavior"
+      ]
+    },
+    {
+      "manufacturer": "IKEA of Sweden",
+      "model": "SILVERGLANS IP44 LED driver",
+      "endpoint": 1,
+      "device_type": 257,
+      "servers": [
+        0,
+        6,
+        8
+      ],
+      "fields": [
+        "power_on_behavior"
+      ]
+    },
+    {
+      "manufacturer": "IKEA of Sweden",
+      "model": "TRADFRI bulb E14 W op/ch 400lm",
+      "endpoint": 1,
+      "device_type": 257,
+      "servers": [
+        0,
+        6,
+        8
+      ],
+      "fields": [
+        "power_on_behavior"
+      ]
+    },
+    {
+      "manufacturer": "IKEA of Sweden",
+      "model": "TRADFRI bulb E14 WS 470lm",
+      "endpoint": 1,
+      "device_type": 268,
+      "servers": [
+        0,
+        6,
+        8,
+        768
+      ],
+      "fields": [
+        "power_on_behavior",
+        "color_options"
+      ]
+    },
+    {
+      "manufacturer": "IKEA of Sweden",
+      "model": "TRADFRI bulb E27 CWS 806lm",
+      "endpoint": 1,
+      "device_type": 269,
+      "servers": [
+        0,
+        6,
+        8,
+        768
+      ],
+      "fields": [
+        "power_on_behavior",
+        "color_options"
+      ]
+    },
+    {
+      "manufacturer": "IKEA of Sweden",
+      "model": "TRADFRI bulb E27 CWS opal 600lm",
+      "endpoint": 1,
+      "device_type": 258,
+      "servers": [
+        0,
+        6,
+        8,
+        768
+      ],
+      "fields": [
+        "power_on_behavior",
+        "color_options"
+      ]
+    },
+    {
+      "manufacturer": "IKEA of Sweden",
+      "model": "TRADFRI bulb E27 WW G95 CL 470lm",
+      "endpoint": 1,
+      "device_type": 257,
+      "servers": [
+        0,
+        6,
+        8
+      ],
+      "fields": [
+        "power_on_behavior"
+      ]
+    },
+    {
+      "manufacturer": "IKEA of Sweden",
+      "model": "TRADFRI bulb E27 WW clear 250lm",
+      "endpoint": 1,
+      "device_type": 257,
+      "servers": [
+        0,
+        6,
+        8
+      ],
+      "fields": [
+        "power_on_behavior"
+      ]
+    },
+    {
+      "manufacturer": "IKEA of Sweden",
+      "model": "TRADFRIbulbB22WSglobeopal1055lm",
+      "endpoint": 1,
+      "device_type": 268,
+      "servers": [
+        0,
+        6,
+        8,
+        768
+      ],
+      "fields": [
+        "power_on_behavior",
+        "color_options"
+      ]
+    },
+    {
+      "manufacturer": "IKEA of Sweden",
+      "model": "TRADFRIbulbE14WWclear250lm",
+      "endpoint": 1,
+      "device_type": 257,
+      "servers": [
+        0,
+        6,
+        8
+      ],
+      "fields": [
+        "power_on_behavior"
+      ]
+    },
+    {
+      "manufacturer": "IKEA of Sweden",
+      "model": "TRADFRIbulbE27WSglobeclear806lm",
+      "endpoint": 1,
+      "device_type": 268,
+      "servers": [
+        0,
+        6,
+        8,
+        768
+      ],
+      "fields": [
+        "power_on_behavior",
+        "color_options"
+      ]
+    },
+    {
+      "manufacturer": "IKEA of Sweden",
+      "model": "TRADFRIbulbG125E27WSopal470lm",
+      "endpoint": 1,
+      "device_type": 268,
+      "servers": [
+        0,
+        6,
+        8,
+        768
+      ],
+      "fields": [
+        "power_on_behavior",
+        "color_options"
+      ]
+    },
+    {
+      "manufacturer": "Signify Netherlands B.V.",
+      "model": "LTA006",
+      "endpoint": 11,
+      "device_type": 268,
+      "servers": [
+        0,
+        6,
+        8
+      ],
+      "fields": [
+        "power_on_behavior"
+      ]
+    },
+    {
+      "manufacturer": "Signify Netherlands B.V.",
+      "model": "LWA001",
+      "endpoint": 11,
+      "device_type": 257,
+      "servers": [
+        0,
+        6,
+        8
+      ],
+      "fields": [
+        "power_on_behavior"
+      ]
+    },
+    {
+      "manufacturer": "Signify Netherlands B.V.",
+      "model": "LWE002",
+      "endpoint": 11,
+      "device_type": 257,
+      "servers": [
+        0,
+        6,
+        8
+      ],
+      "fields": [
+        "power_on_behavior"
+      ]
+    },
+    {
+      "manufacturer": "Signify Netherlands B.V.",
+      "model": "LWE004",
+      "endpoint": 11,
+      "device_type": 257,
+      "servers": [
+        0,
+        6,
+        8
+      ],
+      "fields": [
+        "power_on_behavior"
+      ]
+    },
+    {
+      "manufacturer": "innr",
+      "model": "BF 263",
+      "endpoint": 1,
+      "device_type": 257,
+      "servers": [
+        0,
+        6,
+        8
+      ],
+      "fields": [
+        "power_on_behavior"
+      ]
+    },
+    {
+      "manufacturer": "innr",
+      "model": "BF 265",
+      "endpoint": 1,
+      "device_type": 257,
+      "servers": [
+        0,
+        6,
+        8
+      ],
+      "fields": [
+        "power_on_behavior"
+      ]
+    },
+    {
+      "manufacturer": "IKEA of Sweden",
+      "model": "VALLHORN Wireless Motion Sensor",
+      "endpoint": 1,
+      "device_type": 2128,
+      "servers": [
+        64641
+      ],
+      "fields": [
+        "lux_value",
+        "timer"
+      ]
+    },
+    {
+      "manufacturer": "Signify Netherlands B.V.",
+      "model": "SML004",
+      "endpoint": 2,
+      "device_type": 263,
+      "servers": [
+        0,
+        1030
+      ],
+      "fields": [
+        "hue_motion_sensitivity",
+        "led_indication",
+        "occupancy_timeout"
+      ]
+    },
+    {
+      "manufacturer": "LUMI",
+      "model": "lumi.motion.ac02",
+      "endpoint": 1,
+      "device_type": 263,
+      "servers": [
+        64704
+      ],
+      "fields": [
+        "lumi_motion_sensitivity",
+        "trigger_indicator",
+        "detection_interval"
+      ]
+    },
+    {
+      "manufacturer": "_TZ3000_lqpt3mvr",
+      "model": "TS0210",
+      "endpoint": 1,
+      "device_type": 1026,
+      "servers": [
+        1280
+      ],
+      "fields": [
+        "sensitivity"
+      ]
+    }
+  ]
+}

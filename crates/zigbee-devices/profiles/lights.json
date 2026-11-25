@@ -1,0 +1,7 @@
+{
+  "source": "https://github.com/zigpy/zha/blob/2da1a5b5676158ac7b603ce6b9f42641cb90e7a0/zha/application/platforms/light/const.py#L94-L112",
+  "profile_device_types": {
+    "260": [256, 257, 258, 265, 267, 268, 269],
+    "49246": [0, 256, 272, 512, 528, 544]
+  }
+}

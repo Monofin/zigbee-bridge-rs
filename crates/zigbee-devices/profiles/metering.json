@@ -1,0 +1,13 @@
+[
+  {
+    "source": "https://github.com/zigpy/zha-device-handlers/blob/b07fa76876e081d48744968f9fb806e7f1fee0ee/zhaquirks/innr/innr_sp120_plug.py",
+    "fingerprint": {
+      "manufacturer": "innr",
+      "model": "SP 120",
+      "endpoint": 1,
+      "profile": 49246,
+      "servers": [1794, 2820]
+    },
+    "summation_manufacturer_code": 4454
+  }
+]

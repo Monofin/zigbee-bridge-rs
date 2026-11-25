@@ -1,0 +1,42 @@
+[package]
+name = "zigbee-bridge-rs"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.90"
+license.workspace = true
+publish = false
+
+[dependencies]
+jiff = "0.2"
+redb = "=5.0.0"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+sha2 = "0.10"
+serde-saphyr = { version = "2", default-features = false, features = ["deserialize"] }
+rustix = { version = "1", features = ["fs"] }
+zigbee-devices = { path = "crates/zigbee-devices" }
+zigbee-zcl = { path = "crates/zigbee-zcl" }
+anyhow = "1"
+rumqttc = { version = "0.25.1", default-features = false, features = ["use-rustls-no-provider"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tempfile = "3"
+tokio = { version = "1", features = ["macros", "rt", "sync", "time"] }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+tokio-serial = { version = "5.5", default-features = false }
+tokio = { version = "1", features = ["io-util", "signal"] }
+
+zigbee-catalogue = { path = "crates/zigbee-catalogue" }
+
+[target.'cfg(unix)'.dev-dependencies]
+tokio = { version = "1", features = ["net", "io-util"] }
+
+[workspace]
+members = ["crates/zigbee-zcl", "crates/zigbee-devices", "crates/zigbee-catalogue"]
+default-members = [".", "crates/zigbee-zcl", "crates/zigbee-devices", "crates/zigbee-catalogue"]
+resolver = "3"
+
+[workspace.package]
+license = "MIT OR Apache-2.0"

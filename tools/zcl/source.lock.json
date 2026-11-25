@@ -1,0 +1,32 @@
+{
+  "repository": "SiliconLabs/gecko_sdk",
+  "tag": "v4.5.1",
+  "commit": "8a2efd2cb191cb250fd4c1e655b16b8a80be1997",
+  "files": {
+    "ami-devices.xml": "f0b24b39954419ca0f66a59a211814cfc7ba4e0e2f3d737dfb4adb5c71eb00ba",
+    "ami.xml": "2d9354ccd230523cd929510359480ff9a7472b2282b433b3da688d0e53bbd53f",
+    "cba-devices.xml": "275ff5e864e6382b5ee158cb30bf0b21c61dda186b133a3c2e2866a9b9f3ed7a",
+    "cba.xml": "1485dc2094aba386cf1da15b4688a1750071b0b32a28fde3adc8ab162cc58c6b",
+    "general.xml": "603988c40bf1a9f229937e446d7e8e2055f376c9edaba2803cf6238ff4ead7bc",
+    "green-power-devices.xml": "7c4debfe42aac84634c5469912a8c45496a6bd1cbf9ac4ac968074aec82faad9",
+    "green-power.xml": "68e67107c726fe66140dd6ae19b876c85e087da01dd1dd1bbbe821320953d121",
+    "ha-devices.xml": "5cd6059a0ad5bc81ff0de78353e0073e5055f66f287032fb4b866fe238a19629",
+    "ha.xml": "c3761fc43b75c7ed10b544f5c4ad332c679918eb22c433a22d2302f210134105",
+    "hc-devices.xml": "bfa2ff3ef7a3d67b2d7ae1e41ab69e1ddb3a422685d5a6603931ad0fcbda1843",
+    "hc.xml": "4dd103e744cb39860d65f15d6106ff6f19dcc92084b16c4bc385b5a732306704",
+    "lo-devices.xml": "4396d6a76a3ef0e8f4873efda135cc173a835e6a51709bb5aea5288e2d85d65a",
+    "ota.xml": "4f5bc1d4f9f49cc2bfc7d6310f77e90a65a15cc99b5313da14c7429ba451ba40",
+    "sample-extensions.xml": "a88d6c3a80d5b4a6144c19e727c6c44ed56200f4cd2228decec18c26f03f8561",
+    "silabs.xml": "c1c418190bc83f6eccbbd6f115d847c969c9603b485fe9bcc4700bf1165671f5",
+    "ta-devices.xml": "0f78ad6bd6f69378de3cec64852ef28665df51ef343f58fad07d7d8bec1bc1ca",
+    "ta.xml": "6099b6380a4bd0f79a65d2b17d64ccae7334d19d35e7dba8c9f1d39b4985b476",
+    "types.xml": "121271d53e2d922151c6c402b8a0cc26d863e2e74fd5c1f32dce486dbc2a1022",
+    "wwah-silabs-devices.xml": "3ac895fff3dfed25326805c827b401ec4d99fc2c60720d062c565178ffd742ba",
+    "wwah-silabs.xml": "1bc70fbe90ef3a31dd083294e273bdd70790ad98bb872de6fdd57a021b71785b",
+    "z3-nfr.xml": "4db165202b49564ee8610c13e14203a8c52db1971d4162bb9e3c7a6786cc4b9b",
+    "zcl-zap.json": "326160a9b0653d262925c4b2fca21463c75b4a26887bd9b7751de492ae86f675",
+    "zigbee-direct.xml": "8ec0b787989144d95db06bf6f630c6e8bf485ccb853eb8b4257890983f6d6af2",
+    "zll-devices.xml": "d02a76aadace97cfb0d341b3f95d92e0a6f06ced88c1f5afa185031cc07a0951",
+    "zll.xml": "a9ff624a7ba3aa61eba93337d9e7c903aae7b85b7c9fb609da208f7a24d12528"
+  }
+}
