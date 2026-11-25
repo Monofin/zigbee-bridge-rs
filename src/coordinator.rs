@@ -12,6 +12,8 @@ const FORM_NETWORK: u16 = 0x1e;
 const PERMIT_JOINING: u16 = 0x22;
 const GET_NODE_ID: u16 = 0x27;
 const GET_NETWORK_PARAMETERS: u16 = 0x28;
+const GET_CONFIGURATION: u16 = 0x52;
+const TC_ADDRESS_CACHE_SIZE: u8 = 0x19;
 const SET_CONFIGURATION: u16 = 0x53;
 const SET_POLICY: u16 = 0x55;
 const GET_POLICY: u16 = 0x56;
@@ -166,11 +168,22 @@ pub async fn start_configured(link: &mut Ezsp<'_>, expected: Network, mode: Star
             "formation requires both current and alternate network keys to be unset"
         );
     }
+    // Ember needs its own IEEE-to-short mapping to decrypt APS key requests
+    // forwarded by routers. A host-side address cache cannot serve that path.
+    let cache_size = request(link, GET_CONFIGURATION, &[TC_ADDRESS_CACHE_SIZE]).await?;
+    let [0, lo, hi] = cache_size[..] else { bail!("cannot read trust-centre address cache size") };
+    let initial = u16::from_le_bytes([lo, hi]);
+    if initial < 2 {
+        checked(link, SET_CONFIGURATION, &[TC_ADDRESS_CACHE_SIZE, 2, 0]).await?;
+        ensure!(request(link, GET_CONFIGURATION, &[TC_ADDRESS_CACHE_SIZE]).await? == [0, 2, 0],
+                "trust-centre address cache readback differs");
+    }
+    println!("Trust-centre security address cache: {initial} entries at startup, {} verified", initial.max(2));
     if let Some(children) = children {
         let expected = [0, children, 0];
-        if request(link, 0x52, &[0x11]).await? != expected {
+        if request(link, GET_CONFIGURATION, &[0x11]).await? != expected {
             checked(link, SET_CONFIGURATION, &[0x11, children, 0]).await?;
-            ensure!(request(link, 0x52, &[0x11]).await? == expected, "child limit readback differs");
+            ensure!(request(link, GET_CONFIGURATION, &[0x11]).await? == expected, "child limit readback differs");
         }
     }
     checked(link, SET_CONFIGURATION, &[12, 2, 0]).await?; // Zigbee PRO stack profile

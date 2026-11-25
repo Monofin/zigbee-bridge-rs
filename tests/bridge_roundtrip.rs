@@ -209,6 +209,7 @@ struct Lamps {
     concentrator_enabled: bool,
     discovery_off: bool,
     child_limit: u16,
+    tc_address_cache: u16,
     tx_power: u8,
     permit_broadcast_open: bool,
     enrolment: enrolment::Radio,
@@ -322,6 +323,15 @@ impl Lamps {
                 response.extend([0, NETWORK.channel, 2, 1, 0, 0]);
                 response.extend(NETWORK.extended_pan);
             }
+            0x52 if args == [0x19] => {
+                response.push(0);
+                response.extend(self.tc_address_cache.to_le_bytes());
+            }
+            0x53 if args == [0x19, 2, 0] => {
+                ensure!(!self.resumed && self.tc_address_cache < 2);
+                self.tc_address_cache = 2;
+                response.push(0);
+            }
             0x52 if args == [0x11] => {
                 response.push(0);
                 response.extend(self.child_limit.to_le_bytes());
@@ -359,6 +369,7 @@ impl Lamps {
                 response.push(0);
             }
             0x17 => {
+                ensure!(self.tc_address_cache >= 2, "security address cache disabled at networkInit");
                 ensure!(!self.resumed && args == [0, 0], "resume must run once");
                 ensure!(self.registered_endpoints.len()==4, "resume before endpoint registration");
                 self.resumed = true;
@@ -796,6 +807,7 @@ async fn ncp_with_offline_reports(port: &mut SerialStream, protocol: u8, restore
         concentrator_enabled: false,
         discovery_off: false,
         child_limit: 16,
+        tc_address_cache: 0,
         tx_power: 0,
         permit_broadcast_open: false,
         enrolment: enrolment::Radio::new(if protocol == 19 { 0xc05e } else { 0x0104 }),
