@@ -9,15 +9,14 @@ publish = false
 [dependencies]
 jiff = "0.2"
 redb = "=5.0.0"
-chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 sha2 = "0.10"
 serde-saphyr = { version = "2", default-features = false, features = ["deserialize"] }
 rustix = { version = "1", features = ["fs"] }
 zigbee-devices = { path = "crates/zigbee-devices" }
 zigbee-zcl = { path = "crates/zigbee-zcl" }
 anyhow = "1"
-rumqttc = { version = "0.25.1", default-features = false, features = ["use-rustls-no-provider"] }
-rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+rumqttc = { version = "0.25.1", default-features = false, features = ["use-native-tls"] }
+native-tls = "0.2.18"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tempfile = "3"

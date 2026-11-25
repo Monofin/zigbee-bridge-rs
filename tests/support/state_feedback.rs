@@ -39,7 +39,7 @@ pub async fn before_delivery(message: &[u8]) {
     {
         // Hold the simulated reply so the broker can publish earlier diagnostics.
         tokio::time::sleep(Duration::from_millis(300)).await;
-        eprintln!("fixture ZCL read response tsn={seq} value={state} at {}", chrono::Utc::now());
+        eprintln!("fixture ZCL read response tsn={seq} value={state} at {}", jiff::Timestamp::now());
     }
 }
 
@@ -65,7 +65,7 @@ pub async fn observe() -> Result<()> {
             ensure!(body.get("last_seen").is_none() && body.get("linkquality").is_none());
             let expected = ["ON", "OFF", "ON"][step];
             ensure!(activity && body["state"] == expected, "expected measured {expected}, got {body}");
-            eprintln!("MQTT measured {expected} at {}", chrono::Utc::now());
+            eprintln!("MQTT measured {expected} at {}", jiff::Timestamp::now());
             step += 1;
             if step == 3 { return Ok(()); }
             activity = false;

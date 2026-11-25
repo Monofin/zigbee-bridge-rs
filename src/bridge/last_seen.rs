@@ -2,7 +2,7 @@
 use super::Bindings;
 use crate::mqtt::Publisher;
 use anyhow::Result;
-use chrono::{DateTime, Local, SecondsFormat, Utc};
+use jiff::{Timestamp, tz::TimeZone};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{
@@ -58,11 +58,11 @@ impl LastSeen {
             Self::Epoch => {
                 Value::from(u64::try_from(time.duration_since(UNIX_EPOCH)?.as_millis())?)
             }
-            Self::Utc => DateTime::<Utc>::from(time)
-                .to_rfc3339_opts(SecondsFormat::Millis, true)
-                .into(),
-            Self::Local => DateTime::<Local>::from(time)
-                .to_rfc3339_opts(SecondsFormat::Millis, false)
+            Self::Utc => format!("{:.3}", Timestamp::try_from(time)?).into(),
+            Self::Local => Timestamp::try_from(time)?
+                .to_zoned(TimeZone::system())
+                .strftime("%FT%T%.3f%:z")
+                .to_string()
                 .into(),
             // This field is published on receipt of the message itself.
             Self::Relative => "0 seconds ago".into(),

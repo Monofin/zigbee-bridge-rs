@@ -28,7 +28,7 @@ Look for the verified coordinator and expected channel, then run the [MQTT healt
 
 ## Quickstart without hardware
 
-On Linux, use a C compiler/linker and a current stable Rust toolchain. The workspace has been tested with Rust 1.96. From a shell:
+On Linux, install a C compiler/linker, pkg-config, the OpenSSL development headers (`libssl-dev` on Debian), and a current stable Rust toolchain. The workspace has been tested with Rust 1.96. From a shell:
 
 ```sh
 git clone https://github.com/Monofin/zigbee-bridge-rs.git

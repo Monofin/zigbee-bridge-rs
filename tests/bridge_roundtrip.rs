@@ -1213,7 +1213,7 @@ async fn run_session(protocol:u8,base:&str,dir:&std::path::Path,session:Scenario
         let path = slave.name().context("PTY name")?;
         drop(slave);
         let mut policy=zigbee_bridge_rs::availability::Catalogue::import(None)?;
-        let last_seen = (session == Scenario::Walk).then(|| chrono::Utc::now().timestamp_millis() as u64);
+        let last_seen = (session == Scenario::Walk).then(|| jiff::Timestamp::now().as_millisecond() as u64);
         policy.import_member(ieee(1),"Router",None,last_seen,Some(&json!(true)))?;
         policy.import_member(ieee(BUTTON),"EndDevice",Some("Battery"),None,Some(&json!(true)))?;
         if !restored {policy.write(dir)?;}

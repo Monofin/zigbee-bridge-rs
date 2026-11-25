@@ -13,7 +13,8 @@ RUN cargo build --locked --release --bins \
     && chmod -R a+rX /notices
 
 FROM debian:bookworm-slim
-COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates libssl3 \
+    && rm -rf /var/lib/apt/lists/*
 COPY --from=build /build/target/release/zigbee-bridge /build/target/release/zigbee-discovery /build/target/release/z2m_migrate /usr/local/bin/
 COPY --from=build /notices/ /usr/share/doc/zigbee-bridge/
 USER 65534:65534
