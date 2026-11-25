@@ -636,6 +636,30 @@ mod tests {
     use super::*;
     use zigbee_devices::input::Inputs;
     #[test]
+    fn device_target_selects_only_the_sonoff_relay() -> Result<()> {
+        use crate::mqtt::discovery;
+        let ep = Endpoint { id: 1, profile: 260, servers: &[0, 6, 0xfc11], clients: &[] };
+        let relay = Household::resolve(&Outlets::builtin()?, &Inputs::builtin()?, Some(("SONOFF", "ZBMINIR2")), &ep, 2)?;
+        let endpoint = discovery::Endpoint { ieee: 1, endpoint: 1, device_availability: false,
+            device_name: "fixture", topic_name: "fixture" };
+        let mut switches = std::collections::BTreeMap::new();
+        for feature in relay.features() {
+            for (topic, payload) in discovery::configs("base", "ha", &endpoint, feature, false)? {
+                if topic.starts_with("ha/switch/") {
+                    let config: Json = serde_json::from_slice(&payload)?;
+                    switches.insert(topic.split('/').nth(3).unwrap().to_owned(), config);
+                }
+            }
+        }
+        assert_eq!(switches.len(), 5);
+        assert!(switches["switch"].get("entity_category").is_none());
+        for setting in ["detach_relay_mode", "turbo_mode", "network_indicator", "delayed_power_on_state"] {
+            assert_eq!(switches[&format!("switch_{setting}")]["entity_category"], "config", "{setting}");
+        }
+        Ok(())
+    }
+
+    #[test]
     fn input_read_uses_device_topic_and_only_the_correlated_server_response() -> Result<()> {
         use crate::{bridge::Bindings, interview_log::{AttributeResult, Descriptor, Entry,
             IdentitySource, InterviewReport, Observation}, mqtt::Command};

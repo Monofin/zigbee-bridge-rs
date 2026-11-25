@@ -129,6 +129,29 @@ pub enum Feature {
     Sensor(Sensor),
 }
 
+impl Feature {
+    /// HA uses the category to exclude secondary entities from device-targeted actions.
+    fn entity_category(self) -> Option<&'static str> {
+        match self {
+            Self::BooleanSetting(_) | Self::Identify | Self::FirmwareUpdate
+            | Self::StringBinary { writable: true, property: "child_lock" | "led_enable" | "outlet_control_protect", .. }
+            | Self::Select { property: "power_on_behavior" | "external_trigger_mode" | "indicator_mode"
+                | "temperature_units" | "temperature_unit" | "motion_sensitivity" | "color_power_on_behavior", .. }
+            | Self::Number { property: "temperature_calibration" | "humidity_calibration" | "comfort_temperature_min"
+                | "comfort_temperature_max" | "comfort_humidity_min" | "comfort_humidity_max" | "effect_speed"
+                | "delayed_power_on_time" | "minimum_range" | "maximum_range" | "detection_delay" | "fading_time"
+                | "occupancy_timeout" | "detection_interval" | "sensitivity", .. }
+            | Self::WriteOnlyText("effect_color") => Some("config"),
+            Self::LastSeen { .. } | Self::Sensor(Sensor::Battery | Sensor::Voltage | Sensor::LinkQuality)
+            | Self::CompositeSensor("color_options") | Self::TextSensor("battery_state")
+            | Self::Binary("battery_low" | "illuminance_above_threshold", _)
+            | Self::Numeric { property: "device_temperature" | "requested_brightness_level" | "requested_brightness_percent", .. }
+                => Some("diagnostic"),
+            _ => None,
+        }
+    }
+}
+
 fn safe_key(s: &str) -> bool {
     !s.is_empty()
         && s.len() <= 256
@@ -372,6 +395,9 @@ pub(crate) fn configs(
         };
         let topic = format!("{prefix}/{domain}/{ieee}/{object}/config");
         payload["device"] = device.clone();
+        if let Some(category) = feature.entity_category() {
+            payload["entity_category"] = json!(category);
+        }
         if domain != "device_automation" {
             payload["unique_id"] = json!(format!("{ieee}_{object}_{base}"));
             payload["availability"] = availability.clone();
@@ -437,7 +463,7 @@ pub(crate) fn configs(
         }
         Feature::LastSeen { timestamp } => {
             let mut payload = json!({
-                "name":"Last seen","enabled_by_default":false,"entity_category":"diagnostic","icon":"mdi:clock",
+                "name":"Last seen","enabled_by_default":false,"icon":"mdi:clock",
                 "value_template":"{% if 'last_seen' in value_json %}{{ value_json.last_seen }}{% endif %}"
             });
             if timestamp { payload["device_class"] = json!("timestamp"); }
@@ -459,14 +485,14 @@ pub(crate) fn configs(
             }))?;
         }
         Feature::Identify => add("button","identify",json!({
-            "name":"Identify","entity_category":"diagnostic","device_class":"identify",
+            "name":"Identify","device_class":"identify",
             "command_topic":format!("{state_topic}/set/identify"),"payload_press":"identify"
         }))?,
         Feature::FirmwareUpdate => add(
             "update",
             "update",
             json!({
-                "name":Value::Null,"device_class":"firmware","entity_category":"config",
+                "name":Value::Null,"device_class":"firmware",
                 "command_topic":format!("{base}/bridge/request/device/ota_update/update"),
                 "payload_install":json!({"id":ieee}).to_string(),
                 "value_template":"{% if 'update' in value_json %}{{ {'latest_version': value_json['update'].latest_version | string, 'installed_version': value_json['update'].installed_version | string, 'in_progress': value_json['update'].state == 'updating', 'update_percentage': value_json['update'].get('progress')} | to_json }}{% endif %}"
@@ -736,7 +762,6 @@ pub(crate) fn configs(
             }
             if matches!(sensor, Sensor::LinkQuality) {
                 payload["enabled_by_default"] = json!(false);
-                payload["entity_category"] = json!("diagnostic");
                 payload["icon"] = json!("mdi:signal");
             }
             add("sensor", property, payload)?;
