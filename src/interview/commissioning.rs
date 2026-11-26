@@ -34,24 +34,17 @@ impl Commissioning {
         if !self.collecting {
             return;
         }
-        match (cb.id, cb.payload.as_slice()) {
-            // trustCenterJoinHandler: an unsecured join/rejoin accepted by the TC.
-            (0x24, [_, _, ieee @ .., 1 | 3, decision, _, _]) if *decision != 2 => {
-                if let Ok(peer) = <[u8; 8]>::try_from(ieee) {
-                    self.peers.insert(peer, false);
-                }
+        if let Some((peer, _, crate::ash::MemberUpdate::Admission)) = cb.member_update() {
+            self.peers.insert(peer.to_le_bytes(), false);
+        }
+        if let (KEY_ESTABLISHMENT, [ieee @ .., status]) = (cb.id, cb.payload.as_slice())
+            && let Ok(peer) = <[u8; 8]>::try_from(ieee)
+            && let Some(verified) = self.peers.get_mut(&peer)
+        {
+            println!("Commissioning peer key status {status:#04x}");
+            if *status == TC_REQUESTER_VERIFY_KEY_SUCCESS {
+                *verified = true;
             }
-            (KEY_ESTABLISHMENT, [ieee @ .., status]) => {
-                if let Ok(peer) = <[u8; 8]>::try_from(ieee)
-                    && let Some(verified) = self.peers.get_mut(&peer)
-                {
-                    println!("Commissioning peer key status {status:#04x}");
-                    if *status == TC_REQUESTER_VERIFY_KEY_SUCCESS {
-                        *verified = true;
-                    }
-                }
-            }
-            _ => {}
         }
     }
 

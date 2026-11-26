@@ -313,6 +313,15 @@ impl Lamps {
                     _ => bail!("unexpected route discovery mode"),
                 };
                 response.extend(delay.to_le_bytes());
+                if self.restored {
+                    // A known device tries a trust-centre rejoin with pairing closed.
+                    // The later MQTT rename and IAS queries must still find this member.
+                    let mut denied = vec![0, 0x90, 1, 0x24, 0];
+                    denied.extend(short(enrolment::NEW).to_le_bytes());
+                    denied.extend(ieee(enrolment::NEW).to_le_bytes());
+                    denied.extend([3, 2, 0, 0]);
+                    callbacks.push(denied);
+                }
                 if self.scenario == Scenario::Observations { callbacks.extend(cold_observations::frames()); }
             }
             0x102 => {

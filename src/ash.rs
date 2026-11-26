@@ -13,6 +13,30 @@ use frame::{Decoder, Frame};
 use std::{error::Error, fmt, io, time::Duration};
 use tokio::time::{Instant, timeout, timeout_at};
 pub use v13::{Callback, Ezsp};
+/// Membership evidence in an Ember trustCenterJoinHandler callback.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum MemberUpdate {
+    SecuredRejoin,
+    Admission,
+    Left,
+}
+
+impl Callback {
+    pub(crate) fn member_update(&self) -> Option<(u64, u16, MemberUpdate)> {
+        let (0x24, [lo, hi, eui @ .., update, decision, _, _]) =
+            (self.id, self.payload.as_slice()) else { return None };
+        let change = match (update, decision) {
+            (2, _) => MemberUpdate::Left,
+            // NO_ACTION is expected for a rejoin already secured with the network key.
+            (0, 0 | 1 | 3) => MemberUpdate::SecuredRejoin,
+            (1 | 3, 0 | 1) => MemberUpdate::Admission,
+            // Denials, ignored unsecured requests and unknown values confer no authority.
+            _ => return None,
+        };
+        Some((u64::from_le_bytes(eui.try_into().ok()?), u16::from_le_bytes([*lo, *hi]), change))
+    }
+}
+
 /// Whether the runtime has a wire codec for this EZSP protocol.
 pub const fn supports_protocol(protocol: u8) -> bool {
     matches!(protocol, 13 | 19)

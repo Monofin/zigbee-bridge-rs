@@ -1,6 +1,6 @@
 //! One bounded interview on the isolated bench. Match replies at both APS and ZDO/ZCL.
 use crate::{
-    ash::{Callback, Destination, Ezsp},
+    ash::{Callback, Destination, Ezsp, MemberUpdate},
     coordinator::{checked, request},
     interview_log::{AttributeResult, Descriptor, IdentitySource, Observation},
 };
@@ -219,13 +219,11 @@ async fn counters(link: &mut Ezsp<'_>) -> Result<()> {
 async fn announcement(link: &mut Ezsp<'_>, until: Instant, keys: &mut Commissioning) -> Result<Destination> {
     let mut admitted = BTreeMap::<[u8; 8], Destination>::new();
     while let Some(cb) = keys.receive(link, until).await? {
-        if let (0x24, [lo, hi, ieee @ .., 1 | 3, decision, _, _]) = (cb.id, cb.payload.as_slice())
-            && *decision != 2
-            && let Ok(ieee) = <[u8; 8]>::try_from(ieee)
-            && let Ok(dest) = link.destination(u64::from_le_bytes(ieee), word(*lo, *hi))
+        if let Some((ieee, short, MemberUpdate::Admission)) = cb.member_update()
+            && let Ok(dest) = link.destination(ieee, short)
             && link.current(&dest)
         {
-            admitted.insert(ieee, dest);
+            admitted.insert(ieee.to_le_bytes(), dest);
         }
         if cb.id != 0x45 {
             continue;
@@ -381,8 +379,8 @@ impl Target<'_> {
             if let (0x7c, [lo,hi]) = (cb.id,cb.payload.as_slice()) {
                 ensure!(word(*lo,*hi) != self.node, "interview address is disputed");
             }
-            if let (0x24, [lo,hi,identity @ ..,_,_,_,_]) = (cb.id,cb.payload.as_slice()) {
-                ensure!(word(*lo,*hi) != self.node && identity != self.ieee, "interviewed membership changed");
+            if let Some((peer, node, _)) = cb.member_update() {
+                ensure!(node != self.node && peer.to_le_bytes() != self.ieee, "interviewed membership changed");
             }
             if cb.id != 0x45 {
                 continue;

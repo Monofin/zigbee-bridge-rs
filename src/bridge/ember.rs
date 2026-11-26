@@ -4,7 +4,7 @@ use super::responses::{self, Outcome};
 use super::addresses::{Addresses, Query, Waiting, valid_pair};
 use super::{Bindings, Identity, Read, endpoint};
 use crate::{
-    ash::{Callback, Destination, Ezsp, Next},
+    ash::{Callback, Destination, Ezsp, MemberUpdate, Next},
     interview::{incoming, inspect_callback},
     mqtt::{Command, Publisher, ReceivedCommand, SubmitError, discovery::Feature},
 };
@@ -539,11 +539,8 @@ async fn serve_radio(
                     addresses.conflict(short);
                     continue;
                 }
-                if cb.id==0x24 && let [lo,hi,eui @ ..,update,decision,_,_]=cb.payload.as_slice()
-                    && let Ok(eui)=<[u8;8]>::try_from(eui) {
-                    let ieee=u64::from_le_bytes(eui);
-                    let short = u16::from_le_bytes([*lo, *hi]);
-                    let admitted = matches!(update, 0 | 1 | 3) && *decision != 2;
+                if let Some((ieee, short, change)) = cb.member_update() {
+                    let admitted = change != MemberUpdate::Left;
                     let known = devices.peers.contains_key(&ieee);
                     if !addresses.membership(ieee, short, admitted, known, Instant::now()) {continue;}
                     if admitted || known {

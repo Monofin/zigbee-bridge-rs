@@ -2,6 +2,7 @@
 //! deadline. Only the durable assignment outlives that loop (ZCL R8 §8.2.2.1.3).
 mod ace;
 mod table;
+use crate::ash::MemberUpdate;
 use super::{Bindings, Identity, zdo};
 use crate::{ash::{Destination, Ezsp}, interview::Incoming};
 use anyhow::Result;
@@ -206,8 +207,7 @@ impl Enrollment {
         &mut self,
         ieee: u64,
         short: u16,
-        update: u8,
-        decision: u8,
+        change: MemberUpdate,
         devices: &Bindings,
     ) -> Result<()> {
         self.status_samples.retain(|k,_|k.0!=ieee);
@@ -215,7 +215,7 @@ impl Enrollment {
         self.invalidate_address(Some(ieee), short, |_| false);
         self.jobs.retain(|k, _| k.0 != ieee);
         self.waiting_for_ids.retain(|k| k.0 != ieee);
-        if update == 2 || decision == 2 {
+        if change == MemberUpdate::Left {
             if self.table.rows.keys().any(|k| k.0 == ieee)
                 || devices.peers.get(&ieee).is_some_and(|(_, eps)| {
                     eps.keys().any(|&ep| server(devices, (ieee, ep)).is_some())
@@ -225,7 +225,7 @@ impl Enrollment {
             }
             self.survey.retain(|k, _| k.0 != ieee);
             self.unread_assignments.retain(|k| k.0 != ieee);
-        } else if decision != 2 && matches!(update, 0 | 1 | 3) {
+        } else {
             for (&key, _) in self.survey.range((ieee, 0)..=(ieee, u8::MAX)) {
                 self.jobs.insert(key, Job::new());
             }

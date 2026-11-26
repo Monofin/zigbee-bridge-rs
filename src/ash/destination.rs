@@ -1,5 +1,5 @@
 //! Destination authority at the host's last cancellable unicast boundary.
-use super::{Callback, Ezsp, ezsp19};
+use super::{Callback, Ezsp, MemberUpdate, ezsp19};
 use crate::bridge::addresses::{AddressLease, Authority, valid_pair};
 use crate::{coordinator::DEADLINE, interview::incoming};
 use anyhow::{Result, ensure};
@@ -74,17 +74,13 @@ fn affects(cb: &Callback, protocol: u8, ieee: u64, short: u16) -> bool {
             }
         }
         (0x7c, [lo, hi]) => u16::from_le_bytes([*lo, *hi]) == short,
-        (0x24, [lo, hi, id @ .., update, decision, _, _]) => {
-            let same_short = u16::from_le_bytes([*lo, *hi]) == short;
-            let same_ieee = id == ieee.to_le_bytes();
-            if matches!(update, 0 | 1 | 3) && *decision != 2 {
-                same_short || same_ieee
+        (0x24, _) => cb.member_update().is_some_and(|(peer, node, change)| {
+            if change == MemberUpdate::Left {
+                peer == ieee && node == short
             } else {
-                // A delayed leave can name an address which now belongs to
-                // someone else. It only revokes its own assignment.
-                same_short && same_ieee
+                peer == ieee || node == short
             }
-        }
+        }),
         (0x45, p) => {
             let normalized;
             let (p, source) = if protocol == 19 {
@@ -396,6 +392,23 @@ mod tests {
             now
         ));
         assert!(recent.available(&key, &replacement, true, now + Duration::from_secs(16)));
+    }
+
+    #[test]
+    fn only_a_membership_change_retires_a_buffered_destination() {
+        let mut payload = vec![1, 2];
+        payload.extend(11u64.to_le_bytes());
+        for (update, decision, change) in [
+            (3, 2, None), (3, 3, None), (1, 2, None), (0xff, 0, None),
+            (0, 3, Some(MemberUpdate::SecuredRejoin)),
+            (3, 0, Some(MemberUpdate::Admission)), (2, 3, Some(MemberUpdate::Left)),
+        ] {
+            let mut wire = payload.clone();
+            wire.extend([update, decision, 0, 0]);
+            let cb = Callback { id: 0x24, payload: wire };
+            assert_eq!(cb.member_update().map(|(_, _, event)| event), change);
+            assert_eq!(affects(&cb, 19, 11, 0x0201), change.is_some());
+        }
     }
 
     #[test]

@@ -6,7 +6,7 @@ use super::{
     zdo::{self, BindingPlan},
 };
 use crate::{
-    ash::{Callback, Destination, Ezsp},
+    ash::{Callback, Destination, Ezsp, MemberUpdate},
     coordinator::request,
     interview::{self, commissioning::Commissioning},
     interview_log::{InterviewLog, InterviewReport},
@@ -562,23 +562,17 @@ impl Management {
         cb: &Callback,
     ) -> Result<()> {
         self.keys.observe(cb);
-        if cb.id == 0x24
-            && let [lo, hi, eui @ .., update, decision, _, _] = cb.payload.as_slice()
-            && let Ok(eui) = <[u8; 8]>::try_from(eui)
-        {
-            let ieee = u64::from_le_bytes(eui);
-            let short = u16::from_le_bytes([*lo, *hi]);
+        if let Some((ieee, short, change)) = cb.member_update() {
             self.invalidate_address(link,Some(ieee),short)?;
-            self.zones.membership(ieee,short,*update,*decision,devices)?;
-            if (*update==2 || *decision==2) && self.ace_readers.has_member(ieee) && !self.zones.departed(ieee) {
+            self.zones.membership(ieee,short,change,devices)?;
+            if change == MemberUpdate::Left && self.ace_readers.has_member(ieee) && !self.zones.departed(ieee) {
                 self.zones.revoke_reader(ieee)?;
             }
-            if *update == 2 {
+            if change == MemberUpdate::Left {
                 self.ota.forget(ieee)?;
-            } else if matches!(update, 0|1|3) && *decision != 2
-                && let Ok(destination) = link.destination(ieee, short)
+            } else if let Ok(destination) = link.destination(ieee, short)
             {
-                if matches!(update, 1|3) && self.keys.admitted(&eui) {
+                if change == MemberUpdate::Admission && self.keys.admitted(&ieee.to_le_bytes()) {
                     self.announcements.insert(ieee, (destination, Instant::now() + Duration::from_secs(180)));
                 } else if devices.peers.contains_key(&ieee) {
                     self.setup_waiting.push_back(destination);

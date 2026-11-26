@@ -169,7 +169,7 @@ async fn restart_after_response_recovers_id_with_fresh_address_and_confirms_only
         .deliver(&mut e, &b, ZONE, &attributes(seq, true, CIE, id))
         .await?;
     assert_eq!(radio.last(), [0x11, 81, 0, 0, id]);
-    e.membership(ZONE.0, 0x2345, 2, 0, &b)?;
+    e.membership(ZONE.0, 0x2345, MemberUpdate::Left, &b)?;
     drop(e);
     let mut e = Enrollment::open(restored.path())?;
     e.start(CIE, &b)?;
@@ -418,7 +418,7 @@ fn ace_directory_requires_confirmed_enrollment_and_current_protected_zone_status
     notify(&mut e,true,9,16,1);
     assert_eq!(e.directory(&members, |_| true)[&9].status,Some(3));
     assert_eq!(e.directory(&members, |_| false)[&9].status,None);
-    e.membership(ZONE.0,0x22,2,0,&members)?;
+    e.membership(ZONE.0,0x22,MemberUpdate::Left,&members)?;
     assert!(e.directory(&members, |_| true).is_empty());
     Ok(())
 }
