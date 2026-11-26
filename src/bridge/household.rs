@@ -250,7 +250,8 @@ impl Household {
                     } else {
                         anyhow::bail!("unsupported relay state")
                     };
-                    (req, None)
+                    let command_id = Frame::decode(&req.frame)?.header.command_id;
+                    (req, Some(Read::OutletDelivery(command_id)))
                 }
                 Operation::Get => (outlet.get_state(seq)?, Some(Read::Household(Query::State))),
             }));
@@ -297,10 +298,16 @@ impl Household {
         let Ok(Payload::ReadAttributesResponse(records)) = Payload::decode(frame) else {
             return false;
         };
+        if let Query::State = query {
+            let [row] = records.as_slice() else { return false };
+            return frame.header.manufacturer.is_none() && (cluster, row.id) == (6, 0) && match row.result {
+                Status::Success(value) => self.outlet.is_some_and(|o| o.state_attribute(cluster, row.id, None, value).is_some()),
+                Status::Error(_) => true,
+            };
+        }
         records.iter().any(|r| match query {
-            Query::SettingWrite(..) => false,
+            Query::SettingWrite(..) | Query::State => false,
             Query::Input(reading) => frame.header.manufacturer.is_none() && (cluster, r.id) == (reading.cluster(), 0),
-            Query::State => frame.header.manufacturer.is_none() && (cluster, r.id) == (6, 0),
             Query::Setting(name) => self
                 .settings.as_ref()
                 .and_then(|s| s.field(name))

@@ -72,6 +72,13 @@ impl Pending {
     /// A failed delivery or a write with no follow-up retires the entry.
     /// The settle interval starts after the adapter confirms delivery.
     fn delivered(&mut self, status:u8, now:Instant) -> bool {
+        if let Some(Read::OutletDelivery(command)) = self.read {
+            // A lost delivery ACK can still mean the relay switched. Read the
+            // actual state in either case. Never retry a switching command.
+            self.read = Some(if status == 0 { Read::OutletReadDue(command) } else { Read::Refresh("state") });
+            self.until = now;
+            return true;
+        }
         if status != 0 || (self.read.is_none() && self.schedule.is_none()) {
             return false;
         }
@@ -98,7 +105,7 @@ impl Pending {
     fn refresh_property(&self) -> Option<&'static str> {
         match self.read {
             Some(Read::Refresh(key)) => Some(key),
-            Some(Read::PowerReadback | Read::ConfirmOnOff(_)) => Some("state"),
+            Some(Read::PowerReadback | Read::ConfirmOnOff(_) | Read::OutletDelivery(_) | Read::OutletReadDue(_)) => Some("state"),
             _ => None,
         }
     }
@@ -106,12 +113,12 @@ impl Pending {
     // After a missing delivery callback or read response, issue one ordinary
     // GET. An ordinary GET has no follow-up, even when that reply is lost.
     fn recovery_read(&self) -> bool {
-        matches!(self.read, Some(Read::ConfirmOnOff(_) | Read::PowerReadback))
+        matches!(self.read, Some(Read::ConfirmOnOff(_) | Read::PowerReadback | Read::OutletDelivery(_)))
     }
 
     fn phase(&self) -> &'static str {
         match self.read {
-            Some(Read::ConfirmOnOff(_)) => "on/off delivery",
+            Some(Read::ConfirmOnOff(_) | Read::OutletDelivery(_)) => "on/off delivery",
             Some(Read::PowerReadback) => "on/off confirmation",
             Some(Read::Light(zigbee_devices::lighting::Property::State)) => "on/off read",
             _ => "control",
@@ -901,11 +908,15 @@ fn pending_power_sender(
         || msg.aps.dst != crate::interview::client_endpoint(6) { return None; }
     let frame = Frame::decode(msg.body).ok()?;
     let p = pending.get(&frame.header.sequence)?;
-    if !matches!(p.read, Some(Read::PowerReadback | Read::Light(zigbee_devices::lighting::Property::State)))
+    if !matches!(p.read, Some(Read::PowerReadback | Read::Light(zigbee_devices::lighting::Property::State) | Read::Household(super::household::Query::State)))
         || p.short != msg.sender || p.peer.1 != msg.aps.src || p.cluster != msg.aps.cluster
         || !link.current(&p.destination) { return None; }
     let binding = devices.devices.get(&p.peer)?;
     if binding.descriptor.profile != msg.aps.profile { return None; }
+    if matches!(p.read, Some(Read::Household(super::household::Query::State))) {
+        // The read was for OnOff alone; bind this reply to its existing lease.
+        return binding.household.completes(super::household::Query::State, 6, frame).then_some(p.peer.0);
+    }
     let ep = endpoint(p.peer.1, &binding.descriptor);
     let light = binding.light(&ep).ok()?;
     let power = light.read_response(zigbee_devices::lighting::Property::State, frame.header.sequence, 6, frame);
@@ -1243,6 +1254,7 @@ async fn dispatch(
                 Some(Read::Equipment(super::equipment::Operation::Schedule(_))) => 2,
                 Some(Read::TuyaLamp(setting)) => setting.id(),
                 Some(Read::ConfirmOnOff(on)) => u8::from(on),
+                Some(Read::OutletDelivery(command) | Read::OutletReadDue(command)) => command,
                 Some(Read::Refresh("state")) => return Ok(()),
                 _ => GeneralCommand::ReadAttributes as u8,
             }
@@ -1342,6 +1354,11 @@ async fn dispatch(
             }
             for (property,value) in values {
                 let name = if b.household.input_property(property) { &b.device_name } else { &b.name };
+                if unicast && property == "state" && msg.aps.cluster == 6
+                    && frame.header.general_command() == Some(GeneralCommand::ReportAttributes)
+                    && let Some(state @ ("ON" | "OFF")) = value.as_str() {
+                    satisfy_outlet_report(pending, peer, msg.sender, state == "ON");
+                }
                 if property=="action" || property=="action_duration" { submitted(out.event(name,property,value))?; }
                 else {submitted(out.state(name,property,value))?;}
             }
@@ -1503,6 +1520,19 @@ async fn dispatch(
     Ok(())
 }
 
+// Reports have their own sequence number. Only let one suppress a queued read
+// when delivery is known and the state agrees with the sole outstanding switch
+// command. TOGGLE has no known result, so it always reads the actual attribute.
+fn satisfy_outlet_report(pending: &mut BTreeMap<u8, Pending>, peer: Identity, short: u16, on: bool) {
+    let mut writes = pending.iter().filter(|(_, p)| p.peer == peer && p.short == short && p.cluster == 6
+        && matches!(p.read, Some(Read::OutletDelivery(_) | Read::OutletReadDue(_))));
+    if let Some((&tag, p)) = writes.next()
+        && matches!(p.read, Some(Read::OutletReadDue(command)) if command == u8::from(on))
+        && writes.next().is_none() {
+        pending.remove(&tag);
+    }
+}
+
 fn declined_power_read(frame: Frame<'_>) -> Option<u8> {
     if frame.header.direction != Direction::ServerToClient || frame.header.manufacturer.is_some() { return None; }
     let Payload::ReadAttributesResponse(records) = Payload::decode(frame).ok()? else { return None };
@@ -1606,6 +1636,59 @@ mod effect_tests {
         assert_eq!(write.refresh_deadline(), Some(now));
         assert!(matches!(write.read, Some(Read::Refresh("state"))));
     }
+    #[test]
+    fn outlet_confirmation_never_replans_the_write() -> Result<()> {
+        use crate::mqtt::Operation;
+        use super::super::household::{Household, Query};
+        use zigbee_devices::{input::Inputs, outlet::Outlets, Endpoint};
+
+        let ep = Endpoint { id: 1, profile: 0x104, servers: &[0, 6], clients: &[] };
+        let outlet = Household::resolve(&Outlets::builtin()?, &Inputs::builtin()?, None, &ep, 0x0009)?;
+        let now = Instant::now();
+        let peer = (13, 1);
+        for (action, id) in [("OFF", 0), ("ON", 1), ("TOGGLE", 2)] {
+            let (write, follow) = outlet.plan(1, Operation::Set, "state", &action.into(), 7)?.unwrap();
+            let wire = Frame::decode(&write.frame)?;
+            assert_eq!(wire.header.frame_type, zigbee_zcl::FrameType::ClusterSpecific);
+            assert_eq!(wire.header.command_id, id);
+            for status in [None, Some(0), Some(1)] {
+                let deadline = now + Duration::from_secs(8);
+                let mut p = Pending { route_epoch: None, schedule: None, peer, short: 9,
+                    destination: Destination::fixture(13, 9), cluster: 6, read: follow, until: deadline };
+                if let Some(status) = status {
+                    assert!(p.delivered(status, now));
+                }
+                let mut pending = BTreeMap::from([(7, p)]);
+                assert_eq!(ready_refresh(&pending, status.map_or(deadline, |_| now), 8), Some((7, 8, peer, "state")));
+                let (get, read) = outlet.plan(1, Operation::Get, "state", &"".into(), 8)?.unwrap();
+                assert_eq!(get.frame, [0x10, 8, 0, 0, 0]);
+                assert!(matches!(read, Some(Read::Household(Query::State))));
+                if status == Some(0) {
+                    satisfy_outlet_report(&mut pending, (14, 1), 9, true);
+                    satisfy_outlet_report(&mut pending, peer, 10, false);
+                    satisfy_outlet_report(&mut pending, peer, 9, id == 0);
+                    assert_eq!(pending.len(), 1);
+                }
+                satisfy_outlet_report(&mut pending, peer, 9, id == 1);
+                assert_eq!(pending.is_empty(), status == Some(0) && action != "TOGGLE");
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn one_report_cannot_confirm_overlapping_outlet_commands() {
+        let peer = (13, 1);
+        let pending_write = |command| Pending {
+            route_epoch: None, schedule: None, peer, short: 9,
+            destination: Destination::fixture(13, 9), cluster: 6,
+            read: Some(Read::OutletReadDue(command)), until: Instant::now(),
+        };
+        let mut pending = BTreeMap::from([(3, pending_write(0)), (4, pending_write(1))]);
+        satisfy_outlet_report(&mut pending, peer, 9, true);
+        assert_eq!(pending.len(), 2);
+    }
+
     #[test]
     fn colour_readback_needs_successful_delivery_and_one_settle_interval() {
         let now=Instant::now();

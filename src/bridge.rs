@@ -62,6 +62,8 @@ enum Read {
     TuyaLamp(zigbee_devices::tuya::lamp::Command),
     LoopStop,
     ConfirmOnOff(bool),
+    OutletDelivery(u8),
+    OutletReadDue(u8),
     PowerReadback,
     Refresh(&'static str),
     Light(Property),
