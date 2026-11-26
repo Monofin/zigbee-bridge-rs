@@ -77,6 +77,23 @@ pub(crate) async fn checked(link: &mut Ezsp<'_>, id: u16, args: &[u8]) -> Result
     Ok(())
 }
 
+const TRUST_CENTER_POLICY: u8 = 0x00;
+const TC_REJOINS_USING_WELL_KNOWN_KEY_POLICY: u8 = 0x09;
+const ALLOW_JOINS: u8 = 0x01;
+const ALLOW_UNSECURED_REJOINS: u8 = 0x02;
+
+async fn verified_policy(link: &mut Ezsp<'_>, policy: u8, decision: u8) -> Result<()> {
+    checked(link, SET_POLICY, &[policy, decision]).await?;
+    ensure!(request(link, GET_POLICY, &[policy]).await? == [0, decision],
+            "EZSP policy {policy:#04x} did not read back {decision:#04x}");
+    Ok(())
+}
+
+pub(crate) async fn join_policy(link: &mut Ezsp<'_>, open: bool) -> Result<()> {
+    let mask = if open { ALLOW_JOINS | ALLOW_UNSECURED_REJOINS } else { ALLOW_UNSECURED_REJOINS };
+    verified_policy(link, TRUST_CENTER_POLICY, mask).await
+}
+
 const TC_KEY_REQUEST_POLICY: u8 = 0x05;
 pub const DENY_TC_KEY_REQUESTS: u8 = 0x50;
 pub const SEND_CURRENT_TC_KEY: u8 = 0x51;
@@ -188,7 +205,9 @@ pub async fn start_configured(link: &mut Ezsp<'_>, expected: Network, mode: Star
     }
     checked(link, SET_CONFIGURATION, &[12, 2, 0]).await?; // Zigbee PRO stack profile
     checked(link, SET_CONFIGURATION, &[13, 5, 0]).await?; // Zigbee security level
-    checked(link, SET_POLICY, &[0, 0]).await?; // trust centre denies new joins
+    // Existing members can recover with their own link key, even with joining closed.
+    verified_policy(link, TC_REJOINS_USING_WELL_KNOWN_KEY_POLICY, 0).await?;
+    join_policy(link, false).await?;
     ensure!(
         status(link, NETWORK_STATE, &[]).await? == 0,
         "unexpected active network before initialization"
@@ -240,9 +259,9 @@ pub async fn start_configured(link: &mut Ezsp<'_>, expected: Network, mode: Star
         }
     }
     checked(link, PERMIT_JOINING, &[0]).await?; // close local joining explicitly
-    let policy = request(link, GET_POLICY, &[0]).await?;
+    let policy = request(link, GET_POLICY, &[TRUST_CENTER_POLICY]).await?;
     ensure!(
-        policy == [0, 0],
+        policy == [0, ALLOW_UNSECURED_REJOINS],
         "trust centre join policy differs from requested policy"
     );
     start_route_discovery(link).await

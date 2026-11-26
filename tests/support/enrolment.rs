@@ -8,6 +8,7 @@ pub struct Radio {
     cie: u64,
     zone: Option<u8>,
     policy: u8,
+    well_known_rejoin: u8,
     tc: u8,
     awaiting_descriptor: bool,
 }
@@ -26,6 +27,7 @@ impl Radio {
             cie: 0,
             zone: None,
             policy: 0,
+            well_known_rejoin: 1,
             tc: 0,
             awaiting_descriptor: false,
         }
@@ -39,6 +41,7 @@ impl Radio {
             // between Active_EP_rsp and Simple_Desc_req.
             (0x60, eui) if self.awaiting_descriptor && eui == ieee(NEW).to_le_bytes() => u16::MAX.to_le_bytes().to_vec(),
             (0x55, [0, decision]) => {
+                ensure!(matches!(decision, 2 | 3) && self.well_known_rejoin == 0);
                 self.policy = *decision;
                 vec![0]
             }
@@ -46,6 +49,11 @@ impl Radio {
                 self.tc = *decision;
                 vec![0]
             }
+            (0x55, [9, 0]) => {
+                self.well_known_rejoin = 0;
+                vec![0]
+            }
+            (0x56, [9]) => vec![0, self.well_known_rejoin],
             (0x56, [0]) => vec![0, self.policy],
             (0x56, [5]) => vec![0, self.tc],
             (0x111, key) => {
@@ -54,6 +62,7 @@ impl Radio {
             }
             (0x6b, []) => vec![],
             (0x22, [duration]) => {
+                ensure!(if *duration == 0 { self.policy & 2 != 0 } else { self.policy == 3 });
                 if *duration != 0 {
                     let eui = ieee(NEW).to_le_bytes();
                     let mut joined = vec![0, 0x90, 1, 0x24, 0, lo, hi];

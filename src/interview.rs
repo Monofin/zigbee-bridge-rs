@@ -79,21 +79,13 @@ pub(crate) async fn open(link: &mut Ezsp<'_>, seconds:u8) -> Result<()> {
         request(link, 0x111, &key).await? == [0; 4],
         "transient commissioning key rejected"
     );
-    checked(link, 0x55, &[0, 3]).await?;
-    ensure!(
-        request(link, 0x56, &[0]).await? == [0, 3],
-        "join policy readback failed"
-    );
+    crate::coordinator::join_policy(link, true).await?;
     checked(link, 0x22, &[seconds]).await
 }
 
 pub(crate) async fn close(link: &mut Ezsp<'_>) -> Result<()> {
     checked(link, 0x22, &[0]).await?;
-    checked(link, 0x55, &[0, 0]).await?;
-    ensure!(
-        request(link, 0x56, &[0]).await? == [0, 0],
-        "closed policy readback failed"
-    );
+    crate::coordinator::join_policy(link, false).await?;
     println!("Pairing closed; trust centre policy verified.");
     Ok(())
 }

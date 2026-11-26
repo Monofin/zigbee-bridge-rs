@@ -242,7 +242,7 @@ impl Lamps {
             // Resume always denies admissions and explicitly closes the local window.
             let repeated_effect = match command {
                 0x22 => args != [0],
-                0x55 => args != [0, 0],
+                0x55 => !matches!(args, [0, 2] | [9, 0]),
                 // The sole durable member of the restored fixture announced RX-on-idle.
                 0x34 => {
                     let id = enrolment::NEW;
