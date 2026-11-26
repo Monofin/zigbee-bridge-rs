@@ -142,6 +142,7 @@ pub async fn run() -> anyhow::Result<()> {
         devices.set_tuya_gateway_internet(online);
     }
     devices.set_all_standard_reports(standard_reports.unwrap_or(false));
+    devices.load_naming(state.as_ref())?;
     devices.load_last_seen(state.as_ref())?;
     devices.load_device_options(store.registry().devices());
     for path in reports {

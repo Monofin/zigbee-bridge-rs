@@ -88,7 +88,7 @@ pub fn bind(bindings: &mut Bindings) -> Result<()> {
         .iter()
         .filter(|(k, _)| k.starts_with(&format!("ha/device_automation/0x{:016x}/", ieee(REMOTE))))
         .collect();
-    ensure!(triggers.len() == 2 && triggers.iter().all(|(_, v)| v["topic"] == "test/remote"));
+    ensure!(triggers.len() == 2 && triggers.iter().all(|(_, v)| v["topic"] == format!("test/bridge/feedback/remote/zcl_{:02x}_command", endpoint(REMOTE))));
     ensure!(triggers.iter().any(|(_, v)| {
         v["payload"] == "6"
             && v["value_template"]

@@ -154,6 +154,13 @@ impl Tracker {
             None => (),
         }
     }
+    pub(crate) fn rename(&mut self, ieee: u64, name: &str) {
+        if let Some(peer) = self.peers.get_mut(&ieee) {
+            peer.name = name.to_owned();
+            self.dirty.insert(ieee);
+        }
+    }
+
     /// The ledger is local to the broker endpoint and base topic. Persist new
     /// ownership before publishing and keep retired names until MQTT PUBACK.
     pub async fn reconcile_topics(&self, out: &crate::mqtt::Publisher) -> Result<()> {

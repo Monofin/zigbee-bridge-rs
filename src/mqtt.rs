@@ -4,6 +4,7 @@ pub mod admin;
 pub mod config;
 pub mod discovery;
 mod pending;
+mod feedback;
 mod shadow;
 mod subscriptions;
 mod retained;
@@ -104,6 +105,7 @@ struct Item {
     expires: Option<tokio::time::Instant>,
     payload: Vec<u8>,
     raw_action: Option<Vec<u8>>,
+    feedback: Vec<(String, Vec<u8>)>,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize)]
@@ -165,6 +167,8 @@ struct Pending {
     waiting: std::collections::VecDeque<String>,
     waiting_names: std::collections::HashSet<String>,
     snapshots: HashMap<String, Map<String, Value>>,
+    feedback: HashMap<String, std::collections::BTreeSet<String>>,
+    live_light: HashMap<String, Map<String, Value>>,
     queued: BTreeMap<u64, Item>,
     dirty: HashMap<String, Dirty>,
     sequence: u64,
@@ -177,6 +181,7 @@ struct Retained {
     receipt: Option<oneshot::Sender<()>>,
 }
 struct Shared {
+    display_names: Mutex<BTreeMap<u64, String>>,
     no_matching_subscribers: AtomicU64,
     discovery_prefix: String,
     base: String,
@@ -295,6 +300,8 @@ impl Publisher {
             .collect();
         for name in names {
             if present {
+                // A rejoined light may have applied its power-on behaviour.
+                q.invalidate_light_power(&name);
                 q.route_epochs.insert(name, epoch);
             } else {
                 q.clear_device(&name);
@@ -417,7 +424,7 @@ impl Publisher {
         } else {
             device
         };
-        let result = self.0.pending.lock().unwrap().put(route, fields, delivery, raw_action, self.0.capacity);
+        let result = self.0.pending.lock().unwrap().put_report(route, fields, delivery, raw_action, self.0.capacity);
         self.0.wake.notify_one();
         result
     }
@@ -522,6 +529,7 @@ pub fn channel_with_prefix(
     options.set_session_expiry_interval(Some(0));
     let (commands, receiver) = mpsc::channel(capacity);
     let publisher = Publisher(Arc::new(Shared {
+        display_names: Default::default(),
         no_matching_subscribers: Default::default(),
         routes: watch::channel(None).0,
         ownership_scope: serde_json::to_string(&(options.broker_address(),base))?,
@@ -944,6 +952,7 @@ impl Worker {
                         expires: _,
                         payload,
                         raw_action,
+                        feedback,
                     }) => {
                         prefer_config = true;
                         let topic = format!("{}/{}", self.base, device);
@@ -951,6 +960,10 @@ impl Worker {
                             .publish(&topic, QoS::AtLeastOnce, false, payload)
                             .await?;
                         count += 1;
+                        for (route, bytes) in feedback {
+                            client.publish(format!("{}/{}", self.base, route), QoS::AtLeastOnce, false, bytes).await?;
+                            count += 1;
+                        }
                         if let Some(raw) = raw_action {
                             client
                                 .publish(format!("{topic}/action"), QoS::AtLeastOnce, false, raw)

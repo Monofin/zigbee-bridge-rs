@@ -60,7 +60,7 @@ pub fn bind(bindings: &mut Bindings) -> Result<()> {
     ] {
         let c = &cfg[&format!("ha/{domain}/0x{:016x}/{name}/config", ieee(DEVICE))];
         ensure!(
-            c["state_topic"] == "test/environment",
+            c["state_topic"] == format!("test/bridge/feedback/environment/{name}"),
             "unexpected {name} state topic"
         );
     }

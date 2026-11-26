@@ -50,6 +50,7 @@ pub fn run() -> anyhow::Result<()> {
     }
     let entries = Store::inspect(&state, |registry| -> Result<Vec<Entry>> {
         let mut bindings = index.map(Bindings::reviewed_lights).unwrap_or_default();
+        bindings.load_naming(&state)?;
         bindings.load_last_seen(&state)?;
         bindings.load_availability(&state)?;
         bindings.load_device_options(registry.devices());
@@ -57,10 +58,22 @@ pub fn run() -> anyhow::Result<()> {
             .devices()
             .map(|d| (d.ieee, d.name.clone()))
             .collect();
-        for ieee in names.keys() {
-            let path = state.join("members").join(format!("{ieee:016x}.member"));
+        // Fresh admissions have a member record even without an imported devices.json.
+        let members = state.join("members");
+        let mut identities: std::collections::BTreeSet<u64> = names.keys().copied().collect();
+        for entry in std::fs::read_dir(&members)? {
+            let path = entry?.path();
+            if path.extension().is_some_and(|ext| ext == "member") {
+                let stem = path.file_stem().and_then(|s| s.to_str()).context("invalid member filename")?;
+                let ieee = u64::from_str_radix(stem, 16)?;
+                ensure!(format!("{ieee:016x}") == stem, "invalid member filename");
+                identities.insert(ieee);
+            }
+        }
+        for ieee in identities {
+            let path = members.join(format!("{ieee:016x}.member"));
             let report = InterviewReport::open(&path).context("opening a staged member report")?;
-            ensure!(report.entries.iter().any(|e|matches!(&e.observation,Observation::Target{ieee:s,..} if u64::from_str_radix(s,16).ok()==Some(*ieee))),
+            ensure!(report.entries.iter().any(|e|matches!(&e.observation,Observation::Target{ieee:s,..} if u64::from_str_radix(s,16).ok()==Some(ieee))),
                 "member filename and report IEEE differ");
             bindings.add(&report, &names)?;
         }

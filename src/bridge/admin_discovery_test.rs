@@ -186,3 +186,52 @@ async fn reinterview_retires_obsolete_owned_configs_even_after_interruption() ->
     })
     .await?
 }
+
+#[test]
+fn naming_preserves_ha_identity_across_label_route_and_restart() -> Result<()> {
+    let dir = tempfile::tempdir()?;
+    let member = report(true);
+    let ieee = format!("0x{MEMBER:016x}");
+    for imported in [false, true] {
+        let old = if imported { "Old sensor" } else { &ieee };
+        let mut names = BTreeMap::from([(MEMBER + 1, "Reserved route".into())]);
+        if imported { names.insert(MEMBER, old.to_owned()); }
+        let mut original = Bindings::default();
+        original.add_fresh(&member, &names)?;
+        let before = original.discovery_snapshot("zb", "ha", None)?;
+        assert!(!before.is_empty());
+
+        let labeled = original.named_candidate(MEMBER, "Van sensor", false, &names)?;
+        let after_label = labeled.discovery_snapshot("zb", "ha", None)?;
+        assert_eq!(before.keys().collect::<Vec<_>>(), after_label.keys().collect::<Vec<_>>());
+        for (topic, original_config) in &before {
+            let mut expected = original_config.clone();
+            expected["device"]["name"] = json!("Van sensor");
+            assert_eq!(after_label[topic], expected);
+        }
+        assert_eq!(labeled.name_info(MEMBER)["route"], old);
+        for invalid in ["Reserved route", "bridge", "a/ep1", "bad+", "0x0200000000000003"] {
+            assert!(labeled.named_candidate(MEMBER, invalid, true, &names).is_err());
+        }
+        let moved = labeled.named_candidate(MEMBER, "van-sensor", true, &names)?;
+        assert_eq!(moved.peer("van-sensor")?, MEMBER);
+        assert!(moved.peer(old).is_err() || old == ieee); // IEEE is always an alias.
+        assert_eq!(moved.peer(&ieee)?, MEMBER);
+        assert_eq!(moved.name_info(MEMBER), json!({"ieee":ieee,"display_name":"Van sensor","route":"van-sensor"}));
+        let after_move = moved.discovery_snapshot("zb", "ha", None)?;
+        for (topic, config) in &after_move {
+            assert_eq!(config["unique_id"], before[topic]["unique_id"]);
+            assert_eq!(config["device"]["identifiers"], before[topic]["device"]["identifiers"]);
+            assert_eq!(config["device"]["name"], "Van sensor");
+        }
+        assert!(after_move.values().any(|c| c["command_topic"].as_str().is_some_and(|t| t.starts_with("zb/van-sensor/set"))));
+        super::super::naming::commit(moved.naming.prepare(dir.path())?, dir.path())?;
+        let mut restored = Bindings::default();
+        restored.load_naming(dir.path())?;
+        restored.add_fresh(&member, &names)?;
+        assert_eq!(restored.discovery_snapshot("zb", "ha", None)?, after_move);
+        let route_only = original.named_candidate(MEMBER,"moved",true,&names)?;
+        assert_eq!(route_only.name_info(MEMBER)["display_name"],old);
+    }
+    Ok(())
+}

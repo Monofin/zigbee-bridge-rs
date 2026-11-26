@@ -47,7 +47,7 @@ pub(super) fn available_tag(link: &Ezsp<'_>, pending: &BTreeMap<u8, Pending>,
 
 fn ready_refresh(pending:&BTreeMap<u8,Pending>,now:Instant,cursor:u8)->Option<(u8,u8,Identity,&'static str)> {
     let (&previous,p)=pending.iter().find(|(_,p)|p.refresh_deadline().is_some_and(|at|at<=now))?;
-    let Some(Read::Refresh(key))=p.read else {return None};
+    let key = p.refresh_property()?;
     let next=if !pending.contains_key(&cursor) {cursor} else {free_application_sequence(previous,pending)?};
     Some((previous,next,p.peer,key))
 }
@@ -75,7 +75,7 @@ impl Pending {
         if status != 0 || (self.read.is_none() && self.schedule.is_none()) {
             return false;
         }
-        if matches!(self.read, Some(Read::ConfirmOnOff)) {
+        if matches!(self.read, Some(Read::ConfirmOnOff(_))) {
             self.read = Some(Read::Refresh("state"));
             self.until = now;
         } else if matches!(self.read, Some(Read::LoopStop)) {
@@ -95,8 +95,31 @@ impl Pending {
         }
         false
     }
+    fn refresh_property(&self) -> Option<&'static str> {
+        match self.read {
+            Some(Read::Refresh(key)) => Some(key),
+            Some(Read::PowerReadback | Read::ConfirmOnOff(_)) => Some("state"),
+            _ => None,
+        }
+    }
+
+    // After a missing delivery callback or read response, issue one ordinary
+    // GET. An ordinary GET has no follow-up, even when that reply is lost.
+    fn recovery_read(&self) -> bool {
+        matches!(self.read, Some(Read::ConfirmOnOff(_) | Read::PowerReadback))
+    }
+
+    fn phase(&self) -> &'static str {
+        match self.read {
+            Some(Read::ConfirmOnOff(_)) => "on/off delivery",
+            Some(Read::PowerReadback) => "on/off confirmation",
+            Some(Read::Light(zigbee_devices::lighting::Property::State)) => "on/off read",
+            _ => "control",
+        }
+    }
+
     pub(super) fn refresh_deadline(&self) -> Option<Instant> {
-        matches!(self.read,Some(Read::Refresh(_))).then_some(self.until)
+        self.refresh_property().map(|_| self.until)
     }
 }
 
@@ -478,8 +501,8 @@ async fn serve_radio(
                 return true;
             }
             eprintln!(
-                "MQTT control timed out: transaction {tag}, endpoint {}, cluster {:#06x}",
-                p.peer.1, p.cluster
+                "MQTT control timed out: transaction {tag}, endpoint {}, cluster {:#06x}, peer {:#06x}, phase {}",
+                p.peer.1, p.cluster, p.short, p.phase()
             );
             false
         });
@@ -533,6 +556,7 @@ async fn serve_radio(
         match next {
             Next::Callback(cb) => {
                 let arrived = Instant::now();
+                let observed_at_ms = wall_ms()?;
                 inspect_callback(&cb)?;
                 if cb.id == 0x7c && let [lo, hi] = cb.payload[..] {
                     let short = u16::from_le_bytes([lo, hi]);
@@ -626,11 +650,11 @@ async fn serve_radio(
                                 presence.seen(ieee, Instant::now(), wall_ms()?);
                                 devices.observed_last_seen(out, ieee, std::time::SystemTime::now())?;
                             }
-                            for (received, saved) in held {
+                            for (received, observed_at_ms, saved) in held {
                                 if !link.current(&destination) { break; }
                                 addresses.remember_recovered(ieee, subject, &saved, Instant::now());
                                 let msg = incoming(&saved.payload)?;
-                                let result = publish_held(link, devices, out, &mut discovered, &destination, &msg, received).await;
+                                let result = publish_held(link, devices, out, &mut pending, &mut discovered, &destination, &msg, received, observed_at_ms).await;
                                 if let Err(error) = result && !crate::ash::locally_refused(&error) {return Err(error);}
                             }
                             if report {
@@ -639,13 +663,13 @@ async fn serve_radio(
                             }
                         } else if report {continue;}
                     } else if report {
-                        addresses.hold_observation(msg.sender, cb, arrived);
+                        addresses.hold_observation(msg.sender, cb, arrived, observed_at_ms);
                         continue;
                     }
                     if response {continue;}
                 }
                 if let Some((m,_))=management.as_mut() && let Err(e)=m.observe(link,out,devices,&cb).await {if crate::ash::locally_refused(&e) {continue;} return Err(e);}
-                let handled=receive(link, cb, resolved_sender, corroborated, &mut addresses, devices, out, &mut pending, &mut discovered,&mut presence, management.as_mut().map(|(m,_)| &mut **m), &mut clock, &mut poll, deferred.as_ref().map(|(w,_)| w.peer.0)).await;
+                let handled=receive(link, cb, observed_at_ms, resolved_sender, corroborated, &mut addresses, devices, out, &mut pending, &mut discovered,&mut presence, management.as_mut().map(|(m,_)| &mut **m), &mut clock, &mut poll, deferred.as_ref().map(|(w,_)| w.peer.0)).await;
                 if let Err(e)=handled && !crate::ash::locally_refused(&e) {return Err(e);}
             }
             Next::Wake(command) => {
@@ -658,8 +682,13 @@ async fn serve_radio(
                         if !active.next(link,devices,out,&mut pending,&mut sequence).await? {batch=None;}
                         continue;
                     }
-                    Input::Refresh(previous,next,id,key)=>{
-                        let Some(previous)=pending.remove(&previous) else {continue;};
+                    Input::Refresh(old_tag,next,id,key)=>{
+                        let Some(previous)=pending.remove(&old_tag) else {continue;};
+                        let recovery = previous.recovery_read();
+                        if recovery {
+                            eprintln!("MQTT control timed out: transaction {old_tag}, endpoint {}, cluster {:#06x}, peer {:#06x}, phase {}; checking current power once",
+                                previous.peer.1, previous.cluster, previous.short, previous.phase());
+                        }
                         sequence = next;
                         let Some(b) = devices.devices.get(&id) else {
                             continue;
@@ -670,10 +699,10 @@ async fn serve_radio(
                                 operation: crate::mqtt::Operation::Get,
                                 properties: serde_json::Map::from_iter([(key.into(), "".into())]),
                             }, previous.route_epoch),
-                            Some((id, key)),Some(id),None,Some(previous.destination),
+                            (!recovery).then_some((id, key)),Some(id),None,Some(previous.destination),
                         )
                     }
-                    Input::Admin(req)=>{management.as_mut().unwrap().0.handle(link,devices,out,req).await?;continue;}
+                    Input::Admin(req)=>{management.as_mut().unwrap().0.handle(link,devices,out,&mut presence,req).await?;continue;}
                     Input::Interview(event) => {
                         let manager = &mut management.as_mut().unwrap().0;
                         if let Some((ieee,mains)) = manager.interview_work(event,link,devices,out).await? {
@@ -740,6 +769,10 @@ async fn serve_radio(
                     Ok((id, steps)) => {
                         if expected.is_some_and(|peer|peer!=id) {continue;}
                         let steps = steps.into_iter().map(|(request, read)| {
+                            let read = match (refresh, read) {
+                                (Some((_, "state")), Some(Read::Light(zigbee_devices::lighting::Property::State))) => Some(Read::PowerReadback),
+                                (_, read) => read,
+                            };
                             let tag = transaction_tag(&request.frame)?;
                             Ok((tag, request, read))
                         }).collect::<Result<Vec<_>>>()?;
@@ -811,9 +844,9 @@ fn application_message(msg: &crate::interview::Incoming<'_>) -> bool {
 }
 
 async fn publish_held(
-    link: &mut Ezsp<'_>, devices: &mut Bindings, out: &Publisher,
+    link: &mut Ezsp<'_>, devices: &mut Bindings, out: &Publisher, pending: &mut BTreeMap<u8, Pending>,
     discovered: &mut BTreeSet<(Identity, u16, u16)>, destination: &Destination,
-    msg: &crate::interview::Incoming<'_>, received: Instant,
+    msg: &crate::interview::Incoming<'_>, received: Instant, observed_at_ms: u64,
 ) -> Result<()> {
     let peer = (destination.ieee(), msg.aps.src);
     let Some(descriptor) = devices.peers.get(&peer.0).and_then(|(_, endpoints)| endpoints.get(&peer.1))
@@ -834,7 +867,8 @@ async fn publish_held(
         return Ok(());
     }
     dispatch(link, devices, out, &mut BTreeMap::new(), discovered, peer, msg, frame,
-        &mut Outcome::initial(msg.aps.cluster, frame), received).await
+        &mut Outcome::initial(msg.aps.cluster, frame), received, observed_at_ms).await?;
+    confirm_light_power(link, devices, pending, peer, destination).await
 }
 
 fn valid_application_endpoint(msg: &crate::interview::Incoming<'_>, frame: Frame<'_>) -> bool {
@@ -856,10 +890,33 @@ fn announced(msg: &crate::interview::Incoming<'_>, source: Option<u64>) -> Optio
     None
 }
 
+// An adapter can resolve the destination of a read and miss the reverse
+// lookup for its reply. The request's lease is sufficient for this reply
+// alone. It grants no routing authority to subsequent unsolicited traffic.
+fn pending_power_sender(
+    msg: &crate::interview::Incoming<'_>, pending: &BTreeMap<u8, Pending>,
+    devices: &Bindings, link: &Ezsp<'_>,
+) -> Option<u64> {
+    if !matches!(msg.kind, 0 | 1) || msg.aps.cluster != 6
+        || msg.aps.dst != crate::interview::client_endpoint(6) { return None; }
+    let frame = Frame::decode(msg.body).ok()?;
+    let p = pending.get(&frame.header.sequence)?;
+    if !matches!(p.read, Some(Read::PowerReadback | Read::Light(zigbee_devices::lighting::Property::State)))
+        || p.short != msg.sender || p.peer.1 != msg.aps.src || p.cluster != msg.aps.cluster
+        || !link.current(&p.destination) { return None; }
+    let binding = devices.devices.get(&p.peer)?;
+    if binding.descriptor.profile != msg.aps.profile { return None; }
+    let ep = endpoint(p.peer.1, &binding.descriptor);
+    let light = binding.light(&ep).ok()?;
+    let power = light.read_response(zigbee_devices::lighting::Property::State, frame.header.sequence, 6, frame);
+    (matches!(power, Ok(Some(_))) || declined_power_read(frame).is_some()).then_some(p.peer.0)
+}
+
 #[allow(clippy::too_many_arguments)]
 async fn receive(
     link: &mut Ezsp<'_>,
     cb: Callback,
+    observed_at_ms: u64,
     source_eui: Option<u64>,
     corroborated: bool,
     addresses: &mut Addresses,
@@ -884,7 +941,7 @@ async fn receive(
         && devices.devices.get(&p.peer).is_some_and(|b| b.descriptor.profile == u16::from_le_bytes([*pl,*ph]))
     {
         if *status != 0 {
-            eprintln!("MQTT control delivery failed: Ember {status:#04x}");
+            eprintln!("MQTT control delivery failed: Ember {status:#04x}, transaction {tag}, peer {:#06x}, endpoint {}, cluster {:#06x}, phase {}", p.short, p.peer.1, p.cluster, p.phase());
         }
         if !p.delivered(*status,Instant::now()) {
             super::weekly_schedule::abort(pending,out,|t,_|t==*tag,"delivery failed")?;
@@ -909,7 +966,8 @@ async fn receive(
     } else {
         match super::zdo::lookup_ieee(link, msg.sender).await? {
             Some(ieee) => Some(ieee),
-            None if !sensitive => addresses.ieee(msg.sender,Instant::now()),
+            None if !sensitive => addresses.ieee(msg.sender,Instant::now())
+                .or_else(|| pending_power_sender(&msg, pending, devices, link)),
             None => None,
         }
     };
@@ -1027,15 +1085,51 @@ async fn receive(
         // These transactions belong to the OTA server or the enrollment state machine.
         return Ok(());
     }
-    dispatch(link, devices, out, pending, discovered, peer, &msg, frame, &mut outcome, now).await?;
-    responses::finish(link, &destination, &msg, frame, outcome).await
+    dispatch(link, devices, out, pending, discovered, peer, &msg, frame, &mut outcome, now, observed_at_ms).await?;
+    responses::finish(link, &destination, &msg, frame, outcome).await?;
+    confirm_light_power(link, devices, pending, peer, &destination).await
+}
+
+// A level or colour observation cannot establish whether the light is on. Resolve
+// that missing attribute using the normal correlated read-response path.
+async fn confirm_light_power(
+    link: &mut Ezsp<'_>, devices: &mut Bindings, pending: &mut BTreeMap<u8, Pending>,
+    peer: Identity, target: &Destination,
+) -> Result<()> {
+    use zigbee_devices::lighting::Property;
+    let Some(binding) = devices.devices.get_mut(&peer) else { return Ok(()) };
+    if !binding.needs_light_power || !binding.permits(Property::State, |a| a.read)
+        || !application_room(pending, 1) || !link.current(target)
+        || pending.values().any(|p| p.peer == peer && p.destination.same_assignment(target)
+            && matches!(p.read, Some(Read::Light(Property::State) | Read::ConfirmOnOff(_) | Read::PowerReadback | Read::Refresh("state")))) {
+        return Ok(());
+    }
+    let profile = binding.descriptor.profile;
+    let endpoints = (crate::interview::client_endpoint(6), peer.1);
+    let Some(tag) = available_tag(link, pending, target, profile, 6, endpoints, 0) else { return Ok(()) };
+    let ep = endpoint(peer.1, &binding.descriptor);
+    let lamp = binding.light(&ep)?;
+    if !lamp.supports(Property::State) {
+        binding.needs_light_power = false;
+        return Ok(());
+    }
+    let request = lamp.get(Property::State, tag)?;
+    binding.needs_light_power = false;
+    if super::zdo::submit_unicast(link, target, profile, request.cluster, endpoints, tag, &request.frame).await? == 0 {
+        pending.insert(tag, Pending {
+            route_epoch: None, peer, short: target.short(), destination: target.clone(),
+            cluster: request.cluster, read: Some(Read::Light(Property::State)), schedule: None,
+            until: Instant::now() + Duration::from_secs(8),
+        });
+    }
+    Ok(())
 }
 
 #[allow(clippy::too_many_arguments)]
 async fn dispatch(
     link: &mut Ezsp<'_>, devices: &mut Bindings, out: &Publisher, pending: &mut BTreeMap<u8, Pending>,
     discovered: &mut BTreeSet<(Identity, u16, u16)>, peer: Identity, msg: &crate::interview::Incoming<'_>,
-    frame: Frame<'_>, outcome: &mut Outcome, received: Instant,
+    frame: Frame<'_>, outcome: &mut Outcome, received: Instant, observed_at_ms: u64,
 ) -> Result<()> {
     let (name, endpoints) = &devices.peers[&peer.0];
     let descriptor = &endpoints[&peer.1];
@@ -1148,6 +1242,8 @@ async fn dispatch(
                 Some(Read::Equipment(super::equipment::Operation::Panel)) => 7,
                 Some(Read::Equipment(super::equipment::Operation::Schedule(_))) => 2,
                 Some(Read::TuyaLamp(setting)) => setting.id(),
+                Some(Read::ConfirmOnOff(on)) => u8::from(on),
+                Some(Read::Refresh("state")) => return Ok(()),
                 _ => GeneralCommand::ReadAttributes as u8,
             }
             && reply.status != 0
@@ -1268,7 +1364,7 @@ async fn dispatch(
         && frame.header.direction == Direction::ServerToClient
         && frame.header.manufacturer.is_none()
     {
-        let mut publish = |id, value| -> Result<()> {
+        let mut publish = |id, value, kind| -> Result<()> {
             if let Some(v) = measurement::observe(&ep, msg.aps.cluster, id, None, value) {
                 use crate::mqtt::discovery::Sensor;
                 let (sensor, v) = match v {
@@ -1293,14 +1389,18 @@ async fn dispatch(
                         Err(e) => return Err(e.into()),
                     }
                 }
-                submitted(sensor.report(out, &b.name, v))?;
+                if matches!(sensor, Sensor::Temperature | Sensor::TemperatureWithForceUpdate(_)) {
+                    submitted(sensor.report_temperature(out, &b.name, peer, v, observed_at_ms, kind))?;
+                } else {
+                    submitted(sensor.report(out, &b.name, v))?;
+                }
             }
             Ok(())
         };
         match Payload::decode(frame) {
             Ok(Payload::ReportAttributes(values)) => {
                 for attr in values {
-                    publish(attr.id, attr.value)?;
+                    publish(attr.id, attr.value, "attributeReport")?;
                 }
             }
             Ok(Payload::ReadAttributesResponse(records)) => {
@@ -1314,7 +1414,7 @@ async fn dispatch(
                         && matches.next().is_none()
                     {
                         match r.result {
-                            Status::Success(v) => publish(r.id, v)?,
+                            Status::Success(v) => publish(r.id, v, "readResponse")?,
                             Status::Error(status) => eprintln!(
                                 "MQTT read declined: transaction {seq}, attribute {:#06x}, ZCL status {:#04x}",
                                 r.id,
@@ -1354,9 +1454,17 @@ async fn dispatch(
         if (p.peer, p.cluster, p.short) != (peer, msg.aps.cluster, msg.sender) {
             return Ok(());
         }
-        let Some(Read::Light(prop)) = p.read else {
-            return Ok(());
+        let prop = match p.read {
+            Some(Read::Light(prop)) => prop,
+            Some(Read::PowerReadback) => zigbee_devices::lighting::Property::State,
+            _ => return Ok(()),
         };
+        if prop == zigbee_devices::lighting::Property::State && msg.aps.cluster == 6
+            && let Some(status) = declined_power_read(frame) {
+            eprintln!("MQTT on/off read declined: transaction {seq}, peer {:#06x}, endpoint {}, ZCL status {status:#04x}", msg.sender, peer.1);
+            pending.remove(&seq);
+            return Ok(());
+        }
         let value = lamp.read_response(prop, seq, msg.aps.cluster, frame);
         if matches!(value, Ok(Some(_))) {
             pending.remove(&seq);
@@ -1367,6 +1475,7 @@ async fn dispatch(
     };
     match values {
         Ok(values) => {
+            let mut needs_power = None;
             for v in values {
                 if frame.header.general_command() == Some(GeneralCommand::ReadAttributesResponse)
                     || b.permits(v.property(), |a| a.report)
@@ -1374,6 +1483,7 @@ async fn dispatch(
                     use zigbee_devices::lighting::Setting;
                     let mode=match v {Setting::Xy(..)=>Some("xy"),Setting::Hs(..)=>Some("hs"),Setting::ColorTemperature(_)=>Some("color_temp"),_=>None};
                     let prop=v.property().name();
+                    needs_power = Some(prop != "state" && !out.has_confirmed_light_power(&b.name));
                     if let Some(mode)=mode {
                         let mut fields=serde_json::Map::from_iter([(prop.into(),v.value()),("color_mode".into(),mode.into())]);
                         if let Some(temperature) = lamp.temperature_from_color(v) {
@@ -1384,10 +1494,21 @@ async fn dispatch(
                     else {submitted(out.state(&b.name,prop,v.value()))?;}
                 }
             }
+            if let Some(needed) = needs_power {
+                devices.devices.get_mut(&peer).expect("interviewed light").needs_light_power = needed;
+            }
         }
         Err(e) => eprintln!("Invalid lighting report: {e}"),
     }
     Ok(())
+}
+
+fn declined_power_read(frame: Frame<'_>) -> Option<u8> {
+    if frame.header.direction != Direction::ServerToClient || frame.header.manufacturer.is_some() { return None; }
+    let Payload::ReadAttributesResponse(records) = Payload::decode(frame).ok()? else { return None };
+    let mut power = records.into_iter().filter(|row| row.id == 0);
+    let Status::Error(status) = power.next()?.result else { return None };
+    power.next().is_none().then_some(status.get())
 }
 
 // The publisher accounts for overload. A full broker queue must not retire the radio.
@@ -1449,13 +1570,38 @@ mod effect_tests {
     }
     use super::*;
     #[test]
-    fn immediate_on_off_readback_requires_successful_delivery() {
+    fn only_an_unambiguous_on_off_error_retires_the_read() {
+        for (wire, expected) in [
+            (&[0x18, 7, 1, 0, 0, 0x86][..], Some(0x86)),
+            (&[0x18, 7, 1, 1, 0, 0x86], None),
+            (&[0x18, 7, 1, 0, 0, 0x86, 0, 0, 0x86], None),
+            (&[0x18, 7, 1, 0, 0, 0, 0x10, 0], None),
+            (&[0x10, 7, 1, 0, 0, 0x86], None),
+        ] {
+            assert_eq!(declined_power_read(Frame::decode(wire).unwrap()), expected);
+        }
+    }
+
+    #[test]
+    fn ordinary_power_read_has_no_recovery_even_after_deadline() {
+        let now = Instant::now();
+        let ordinary = Pending {
+            route_epoch: None, schedule: None, peer: (13, 11), short: 7,
+            destination: Destination::fixture(13, 7), cluster: 6,
+            read: Some(Read::Light(zigbee_devices::lighting::Property::State)), until: now,
+        };
+        assert!(!ordinary.recovery_read());
+        assert_eq!(ordinary.refresh_deadline(), None);
+    }
+
+    #[test]
+    fn delivery_makes_the_on_off_readback_due_immediately() {
         let now = Instant::now();
         let mut write = Pending { route_epoch: None, schedule: None, peer: (13, 11), short: 7,
-            destination: Destination::fixture(13, 7), cluster: 6, read: Some(Read::ConfirmOnOff),
+            destination: Destination::fixture(13, 7), cluster: 6, read: Some(Read::ConfirmOnOff(false)),
             until: now + Duration::from_secs(8) };
         assert!(!write.delivered(1, now));
-        assert_eq!(write.refresh_deadline(), None);
+        assert_eq!(write.refresh_deadline(), Some(now + Duration::from_secs(8)));
         assert!(write.delivered(0, now));
         assert_eq!(write.refresh_deadline(), Some(now));
         assert!(matches!(write.read, Some(Read::Refresh("state"))));

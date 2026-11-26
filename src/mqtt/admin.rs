@@ -57,6 +57,8 @@ pub struct DoorLockRequest { pub id: String, pub endpoint: u8, pub action: LockA
 
 #[derive(Debug, Serialize)]
 pub enum Action {
+    DisplayName { id: String, name: String },
+    RenameRoute { id: String, name: String },
     Describe(Describe),
     HealthCheck,
     Endpoint(EndpointRequest),
@@ -391,6 +393,23 @@ fn decode(base: &str, p: &Publish) -> Option<Parsed> {
             return Some((envelope, Err("Invalid transaction identifier")));
         }
         envelope.transaction = Some(tx);
+    }
+    if matches!(path, "device/display_name" | "device/rename_route") {
+        #[derive(Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct Rename { id: String, name: String }
+        let request = if namespace != "v1/" || envelope.transaction.is_none() {
+            Err("Naming operations require API v1 and a transaction ID")
+        } else {
+            read::<Rename>(value).and_then(|r| {
+                if !name(&r.id) || !name(&r.name) || r.name.trim() != r.name || r.name.chars().any(char::is_control) {
+                    return Err("Supply a device and a non-empty name without surrounding spaces or control characters");
+                }
+                Ok(if path.ends_with("display_name") { Action::DisplayName {id:r.id, name:r.name} }
+                   else { Action::RenameRoute {id:r.id, name:r.name} })
+            })
+        };
+        return Some((envelope, request));
     }
     if path == "device/lock" {
         let request = if namespace != "v1/" || envelope.transaction.is_none() {

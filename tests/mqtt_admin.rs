@@ -212,7 +212,7 @@ async fn admin() -> Result<()> {
     .await?;
     let data: Value = serde_json::from_slice(&config.payload)?;
     assert_eq!(data["unique_id"], "0x0000000000000009_update_admin-test");
-    assert_eq!(data["state_topic"], "admin-test/test-lamp");
+    assert_eq!(data["state_topic"], "admin-test/bridge/feedback/test-lamp/update");
     assert_eq!(
         data["command_topic"],
         "admin-test/bridge/request/device/ota_update/update"

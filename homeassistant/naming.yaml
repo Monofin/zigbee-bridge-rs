@@ -1,0 +1,50 @@
+blueprint:
+  name: Zigbee bridge device naming
+  description: Set the bridge-suggested display name, or explicitly move the device's MQTT route.
+  domain: script
+  input:
+    api_sensor:
+      name: Bridge admin API sensor
+      selector:
+        entity:
+          filter: [{domain: sensor, integration: mqtt}]
+fields:
+  device:
+    name: Zigbee device
+    required: true
+    selector:
+      device:
+        filter: [{integration: mqtt}]
+  operation:
+    name: Change
+    default: display_name
+    required: true
+    selector:
+      select:
+        options:
+          - {label: Display name, value: display_name}
+          - {label: MQTT route (update external scripts), value: rename_route}
+  new_name:
+    name: New name
+    required: true
+    selector:
+      text:
+mode: single
+sequence:
+  - variables:
+      api: !input api_sensor
+      base: "{{ state_attr(api, 'mqtt_base') }}"
+      ieee: >-
+        {{ device_attr(device, 'identifiers') | default([], true)
+           | selectattr('0', 'eq', 'mqtt') | map(attribute='1')
+           | select('match', '^zigbee2mqtt_0x[0-9a-f]{16}$') | map('replace', 'zigbee2mqtt_', '') | first | default('') }}
+  - if: "{{ not is_state(api, '1') or not base or not ieee or operation not in ['display_name', 'rename_route'] or not new_name | trim }}"
+    then:
+      - stop: Select a joined device, choose a name and check the bridge API is online.
+        error: true
+  - action: mqtt.publish
+    data:
+      topic: "{{ base }}/bridge/v1/request/device/{{ operation }}"
+      qos: 1
+      retain: false
+      payload: "{{ dict(id=ieee, name=new_name, transaction='ha-' ~ now().isoformat()) | to_json }}"

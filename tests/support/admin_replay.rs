@@ -199,5 +199,26 @@ pub async fn verify(base: &str) -> Result<()> {
     // The restored coordinator has no PIN directory. Repeating a transaction returns
     // its original readback, and the simulated adapter rejects any additional send.
     super::lock_control::verify(&client, &mut events, base).await?;
+    // Rename a restored member through the public API without contacting the radio.
+    let id = format!("0x{:016x}", ieee(enrolment::NEW));
+    for (op, name, route) in [
+        ("display_name", "Bench sensor", id.as_str()),
+        ("rename_route", "bench-sensor", "bench-sensor"),
+    ] {
+        let request = json!({"id":id,"name":name,"transaction":op});
+        client.publish(format!("{base}/bridge/v1/request/device/{op}"),
+            QoS::AtLeastOnce, false, serde_json::to_vec(&request)?).await?;
+        loop {
+            if let Event::Incoming(Incoming::Publish(p)) = events.poll().await?
+                && p.topic == format!("{base}/bridge/v1/response/device/{op}")
+            {
+                let result: Value = serde_json::from_slice(&p.payload)?;
+                ensure!(result == json!({"status":"ok","transaction":op,
+                    "data":{"ieee":id,"display_name":"Bench sensor","route":route}}),
+                    "unexpected naming response: {result}");
+                break;
+            }
+        }
+    }
     Ok(())
 }

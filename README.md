@@ -97,6 +97,10 @@ For an authenticated broker, supply `username` and `password_file`. TLS defaults
 
 For the example base topic, watch `zigbee-bench/bridge/state` and `zigbee-bench/bridge/info`. With admin API major version 1, subscribe to `zigbee-bench/bridge/v1/response/health_check` and then publish `{"transaction":"check-1"}` to `zigbee-bench/bridge/v1/request/health_check` with retain disabled. Match the transaction in the response. The [MQTT reference](REFERENCE.md#mqtt-administration-and-migration) covers pairing windows, device commands, groups, binding and firmware. The [Home Assistant dashboard](homeassistant/README.md) exposes the same controls.
 
+A newly paired device starts with its IEEE address as its MQTT route. Use `device/display_name` to give it a readable name in Home Assistant. Use `device/rename_route` when you also want to move its MQTT topics. Both operations preserve its Home Assistant unique IDs. [Naming and readback examples](REFERENCE.md#device-naming).
+
+The device topic contains its merged state for MQTT consumers. Home Assistant subscribes to separate feedback topics so a battery report or firmware check cannot make an old light reading appear fresh. If a light first reports brightness, the bridge reads its power state before publishing the light to Home Assistant.
+
 ## Libraries and contributions
 
 The workspace includes reusable crates for [ZCL wire types and codecs](crates/zigbee-zcl), [device profiles and behaviour](crates/zigbee-devices), and [catalogue matching](crates/zigbee-catalogue). See [CONTRIBUTING.md](CONTRIBUTING.md) for testing, upstream provenance and how to submit a change. The design notes cover [coordinator shutdown](LIFECYCLE.md), [address resolution](ADDRESS-RESOLUTION.md) and [MQTT delivery and recovery](MQTT-DESIGN.md).

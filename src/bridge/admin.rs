@@ -194,6 +194,7 @@ impl Management {
         devices: &mut Bindings,
         out: &Publisher,
     ) -> Result<()> {
+        devices.load_naming(self.dir.parent().context("missing state directory")?)?;
         devices.load_availability(self.dir.parent().context("missing state directory")?)?;
         for entry in fs::read_dir(&self.dir)? {
             let path = entry?.path();
@@ -417,15 +418,65 @@ impl Management {
             Err(e) => Err(e.into()),
         }
     }
+    async fn name_device(
+        &mut self, devices: &mut Bindings, out: &Publisher, presence: &mut crate::availability::tracker::Tracker,
+        action: Action, reply: Reply,
+    ) -> Result<()> {
+        let (id, name, route) = match action {
+            Action::DisplayName { id, name } => (id, name, false),
+            Action::RenameRoute { id, name } => (id, name, true),
+            _ => unreachable!(),
+        };
+        let candidate = devices.peer(&id).and_then(|ieee| {
+            Ok((ieee, devices.named_candidate(ieee, &name, route, &self.names)?))
+        });
+        let (ieee, next) = match candidate {
+            Ok(v) => v,
+            Err(e) => { reply.error(&e.to_string())?; return Ok(()); }
+        };
+        // If publication is interrupted after the rename, explicitly report
+        // an uncertain result and let startup reconcile from the committed file.
+        let dir = self.dir.parent().context("missing state directory")?.to_owned();
+        let prepared = match next.naming.prepare(&dir) {
+            Ok(file) => file,
+            Err(e) => { reply.error(&format!("Could not stage device naming: {e}"))?; return Ok(()); }
+        };
+        let commit: Result<()> = async {
+            super::naming::commit(prepared, &dir)?;
+            *devices = next;
+            devices.mqtt_routes(out)?;
+            if route {
+                presence.rename(ieee, &devices.peers[&ieee].0);
+                presence.reconcile_topics(out).await?;
+                presence.publish_due(out, Instant::now())?;
+            }
+            devices.advertise_member(out, ieee).await?;
+            if self.advertised_updates.remove(&ieee) {
+                self.update_state(out, devices, ieee)?;
+            }
+            Ok(())
+        }.await;
+        if let Err(e) = commit {
+            reply.indeterminate("Interrupted while applying device naming; inspect discovery after recovery")?;
+            return Err(e);
+        }
+        reply.ok(devices.name_info(ieee))?;
+        Ok(())
+    }
+
     pub(super) async fn handle(
         &mut self,
         link: &mut Ezsp<'_>,
-        devices: &Bindings,
+        devices: &mut Bindings,
         out: &Publisher,
+        presence: &mut crate::availability::tracker::Tracker,
         req: Request,
     ) -> Result<()> {
         let Request { action, reply } = req;
         let Some(reply)=reply.reserve(&self.transactions,&action)? else {return Ok(())};
+        if matches!(action, Action::DisplayName { .. } | Action::RenameRoute { .. }) {
+            return self.name_device(devices, out, presence, action, reply).await;
+        }
         if let Action::DoorLock(req) = action {
             if devices.peer(&req.id).is_ok_and(|id|self.zones.departed(id)) {
                 reply.error("lock has left the network")?;
@@ -500,8 +551,10 @@ impl Management {
         }
         let result=async{
             Ok(match action {
+                Action::DisplayName { .. } | Action::RenameRoute { .. } => unreachable!(),
                 Action::Describe(query) => {
                     let mut description=devices.describe_standard(&query)?;
+                    description["naming"] = devices.name_info(devices.peer(&query.id)?);
                     if let Some(ep)=query.endpoint && query.cluster.is_none_or(|c|c==zigbee_devices::ias::CLUSTER) {
                         let key=(devices.peer(&query.id)?,ep);
                         if super::enrollment::server(devices,key).is_some() {

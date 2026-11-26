@@ -1,6 +1,7 @@
 //! Bind interviewed endpoint functions to MQTT properties and radio operations.
 pub(crate) mod addresses;
 mod bindings;
+mod naming;
 mod ace;
 mod discovery_ownership;
 mod basic_io;
@@ -60,7 +61,8 @@ enum Read {
     LevelConfig(level_config::Operation),
     TuyaLamp(zigbee_devices::tuya::lamp::Command),
     LoopStop,
-    ConfirmOnOff,
+    ConfirmOnOff(bool),
+    PowerReadback,
     Refresh(&'static str),
     Light(Property),
     Startup(zigbee_devices::standard_controls::StartupRequest),
@@ -96,6 +98,7 @@ struct Binding {
     controls: zigbee_devices::standard_controls::Controls,
     level_state: zigbee_devices::standard_controls::level_config::State,
     confirmed_hue_scene: Option<u8>,
+    needs_light_power: bool,
     device_name: String,
     access: Option<(Access, Access)>,
     io: Vec<zigbee_devices::basic_io::Channel>,
@@ -165,6 +168,7 @@ impl Binding {
 
 #[derive(Clone,Default)]
 pub struct Bindings {
+    naming: naming::Names,
     receiver_on_when_idle: BTreeMap<u64, bool>,
     complete_descriptors: std::collections::BTreeSet<u64>,
     all_standard_reports: bool,

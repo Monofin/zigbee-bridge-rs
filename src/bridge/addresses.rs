@@ -38,7 +38,7 @@ struct Probe {
     until: Instant,
     sequence: Option<u8>,
     issued: u64,
-    observations: Vec<(Instant, Callback)>,
+    observations: Vec<(Instant, u64, Callback)>,
 }
 
 /// Permission to attribute an effect to exactly one assignment in one session.
@@ -621,7 +621,7 @@ impl Authority {
     }
     /// Held observations share the reverse query's deadline and cancellation. A
     /// leave, conflict, rejected query or session shutdown drops its payloads.
-    pub(super) fn hold_observation(&self, node: u16, callback: Callback, now: Instant) {
+    pub(super) fn hold_observation(&self, node: u16, callback: Callback, now: Instant, observed_at_ms: u64) {
         let mut state = self.lock();
         if state.disputed(node) || !state.enqueue(Query::Ieee(node), now) {
             return;
@@ -630,12 +630,12 @@ impl Authority {
             .expect("admitted reverse lookup");
         // Exclude last-hop LQI and RSSI when comparing copies of the same APS frame.
         if probe.observations.len() < CAPACITY
-            && !probe.observations.iter().any(|(_, old)| same_aps_frame(old, &callback)) {
-            probe.observations.push((now, callback));
+            && !probe.observations.iter().any(|(_, _, old)| same_aps_frame(old, &callback)) {
+            probe.observations.push((now, observed_at_ms, callback));
         }
     }
 
-    pub(super) fn take_observations(&self, node: u16, now: Instant) -> Vec<(Instant, Callback)> {
+    pub(super) fn take_observations(&self, node: u16, now: Instant) -> Vec<(Instant, u64, Callback)> {
         self.lock().probes.iter_mut()
             .find(|p| p.key == Query::Ieee(node) && p.until > now)
             .map(|p| std::mem::take(&mut p.observations)).unwrap_or_default()
@@ -1230,7 +1230,7 @@ mod tests {
         let sample = Callback { id: 0x45, payload: vec![0; 20] };
         for change in ["conflict", "leave", "admission", "expiry", "shutdown"] {
             let book = started_book();
-            book.hold_observation(SHORT, sample.clone(), now);
+            book.hold_observation(SHORT, sample.clone(), now, 1000);
             match change {
                 "conflict" => book.conflict(SHORT),
                 "leave" => assert!(book.membership(LIGHT, SHORT, false, true, now)),

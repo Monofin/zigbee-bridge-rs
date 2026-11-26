@@ -34,6 +34,19 @@ Supply `--ota-manifest FILE`. Its `images` array lists `id`, `file` (a local bas
 
 See the [offline migration and rollback guide](MIGRATION.md) for staging a copied Z2M database, comparing HA discovery and checking adapter compatibility before any service handover.
 
+### Device naming
+
+A newly paired device uses its permanent IEEE address for its MQTT route. Migration uses the existing Zigbee2MQTT friendly name. Configure the bridge’s suggested display name after commissioning. Home Assistant’s device registry can independently override that label.
+
+| Request under `BASE/bridge/v1/request/` | Example payload | Effect |
+| --- | --- | --- |
+| `device/display_name` | `{"id":"0x0200000000000001","name":"Humidity sensor","transaction":"label-1"}` | Updates the name in discovery. MQTT routes stay stable. |
+| `device/rename_route` | `{"id":"0x0200000000000001","name":"humidity-sensor","transaction":"route-1"}` | Moves the device’s routes and command subscriptions. Its display name and HA unique IDs stay stable. |
+
+Use a non-retained publication and subscribe to the matching `BASE/bridge/v1/response/device/…` topic before submitting it. Supply the current route or IEEE as `id`. A route rename accepts one unreserved MQTT topic level and rejects collisions. Each transaction returns `ieee`, `display_name` and `route` on success. Read back those values with `device/describe`. The optional [Home Assistant naming script](homeassistant/README.md#name-a-joined-device) uses the same operations.
+
+The coordinator stores explicit names by IEEE in `device-names.json` inside the state directory. Include it with the member files and imported registry in backups. Consumers subscribing directly to a renamed route need to subscribe to the new topic.
+
 ## Device database
 
 We chose `redb` for the coordinator’s host-side device database. The running bridge still uses `devices.json`; migration to the redb schema is part of building the replacement. Device and Home Assistant discovery identities must survive backup and restore.

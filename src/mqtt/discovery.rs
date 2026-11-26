@@ -42,7 +42,19 @@ impl Sensor {
         }
     }
 
-    fn metadata(self) -> (&'static str, Option<&'static str>, &'static str) {
+    pub(crate) fn report_temperature(self, out: &Publisher, name: &str, (ieee, endpoint): (u64, u8),
+        value: Value, observed_at_ms: u64, kind: &str) -> Result<(), SubmitError> {
+        let observation = json!({"observed_at_ms": observed_at_ms, "ieee": format!("0x{ieee:016x}"),
+            "endpoint": endpoint, "kind": kind});
+        let fields = serde_json::Map::from_iter([("temperature".into(), value),
+            ("temperature_observation".into(), observation)]);
+        let delivery = if matches!(self, Self::TemperatureWithForceUpdate(true)) {
+            super::Delivery::Observation
+        } else { super::Delivery::State };
+        out.submit(name, fields, delivery)
+    }
+
+    pub(super) fn metadata(self) -> (&'static str, Option<&'static str>, &'static str) {
         match self {
             Self::LinkQuality => ("linkquality", None, "lqi"),
             Self::SoilMoisture => ("soil_moisture", Some("moisture"), "%"),
@@ -188,13 +200,8 @@ impl Publisher {
         endpoint: &Endpoint<'_>,
         feature: Feature,
     ) -> Result<(), SubmitError> {
-        self.enqueue_configs(&mut configs(
-            &self.0.base,
-            prefix,
-            endpoint,
-            feature,
-            false,
-        )?)
+        self.enqueue_configs(&mut self.member_configs(prefix, endpoint, feature)?)?;
+        self.register_feedback(endpoint, feature)
     }
 
     /// A startup producer can await bounded queue space without occupying the
@@ -205,8 +212,18 @@ impl Publisher {
         endpoint: &Endpoint<'_>,
         feature: Feature,
     ) -> Result<(), SubmitError> {
-        let configs = configs(&self.0.base, prefix, endpoint, feature, false)?;
-        self.enqueue_when_ready(configs).await
+        let configs = self.member_configs(prefix, endpoint, feature)?;
+        self.enqueue_when_ready(configs).await?;
+        self.register_feedback(endpoint, feature)
+    }
+
+    pub(crate) fn set_display_names(&self, names: impl Iterator<Item = (u64, String)>) {
+        *self.0.display_names.lock().unwrap() = names.collect();
+    }
+
+    fn member_configs(&self, prefix: &str, ep: &Endpoint<'_>, feature: Feature) -> Result<Vec<(String, Vec<u8>)>, SubmitError> {
+        let names = self.0.display_names.lock().unwrap();
+        configs_named(&self.0.base, prefix, ep, feature, false, names.get(&ep.ieee).map(String::as_str))
     }
 
     async fn enqueue_when_ready(
@@ -321,7 +338,7 @@ pub(crate) fn admin_configs(
     add("sensor", "health_result", json!({"name":"Last coordinator check",
         "state_topic":format!("{root}/response/health_check"),
         "value_template":"{{ 'Healthy' if value_json.status == 'ok' and value_json.data.healthy | default(false) else 'Failed' }}"}));
-    for (op, name) in [("bind", "Last binding"), ("unbind", "Last unbinding")] {
+    for (op, name) in [("bind", "Last binding"), ("unbind", "Last unbinding"), ("display_name", "Last display name change"), ("rename_route", "Last MQTT route change")] {
         add("sensor", op, json!({"name":name,"state_topic":format!("{root}/response/device/{op}"),
             "json_attributes_topic":format!("{root}/response/device/{op}"),
             "value_template":"{{ 'Failed' if value_json.status != 'ok' else ('Partially completed' if value_json.data.failed | default([]) else 'Completed') }}"}));
@@ -359,6 +376,12 @@ pub(crate) fn configs(
     feature: Feature,
     remove: bool,
 ) -> Result<Vec<(String, Vec<u8>)>, SubmitError> {
+    configs_named(base, prefix, ep, feature, remove, None)
+}
+
+pub(crate) fn configs_named(
+    base: &str, prefix: &str, ep: &Endpoint<'_>, feature: Feature, remove: bool, display: Option<&str>,
+) -> Result<Vec<(String, Vec<u8>)>, SubmitError> {
     if !topic_part(prefix)
         || prefix.split('/').any(str::is_empty)
         || !device_name(ep.topic_name)
@@ -372,7 +395,7 @@ pub(crate) fn configs(
     }
     let ieee = format!("0x{:016x}", ep.ieee);
     let state_topic = format!("{base}/{}", ep.topic_name);
-    let device = json!({"identifiers":[format!("zigbee2mqtt_{ieee}")], "name":ep.device_name});
+    let device = json!({"identifiers":[format!("zigbee2mqtt_{ieee}")], "name":display.unwrap_or(ep.device_name)});
     let mut availability =
         json!([{"topic":format!("{base}/bridge/state"),"value_template":"{{ value_json.state }}"}]);
     if ep.device_availability {
@@ -402,16 +425,8 @@ pub(crate) fn configs(
             payload["unique_id"] = json!(format!("{ieee}_{object}_{base}"));
             payload["availability"] = availability.clone();
             if ep.device_availability { payload["availability_mode"]=json!("all"); }
-            if !matches!(domain,"button"|"climate") && !matches!(feature, Feature::Effect(_) | Feature::WriteOnlyText(_)) {
-                payload["state_topic"] = if domain == "sensor" && matches!(object.as_str(), "linkquality" | "last_seen") {
-                    json!(format!("{base}/{}", super::diagnostic_route(ep.device_name)))
-                } else if device_level {
-                    json!(format!("{base}/{}", ep.device_name))
-                } else {
-                    json!(state_topic)
-                };
-            }
         }
+        feature.set_feedback_topics(ep, base, &mut payload);
         let bytes = if remove {
             Vec::new()
         } else {

@@ -29,12 +29,17 @@ impl Pending {
         raw_action: Option<Vec<u8>>,
         cap: usize,
     ) -> Result<(), SubmitError> {
+        self.put_with_feedback(device, fields, delivery, raw_action, Vec::new(), cap)
+    }
+
+    pub(super) fn put_with_feedback(&mut self, device: &str, fields: Map<String, Value>, delivery: Delivery,
+        raw_action: Option<Vec<u8>>, feedback: Vec<(String, Vec<u8>)>, cap: usize) -> Result<(), SubmitError> {
         if self.closed {
             return Err(SubmitError::Closed);
         }
         let owner = device.strip_prefix(RADIO_DIAGNOSTICS).unwrap_or(device);
         if delivery == Delivery::State {
-            if !self.identities.contains_key(owner)
+            if feedback::owner(device).is_none() && !self.identities.contains_key(owner)
                 && !self.dirty.contains_key(device)
                 && self.dirty.len() == cap
             {
@@ -49,9 +54,15 @@ impl Pending {
         } else {
             self.snapshots.get(device).cloned().unwrap_or_default()
         };
+        // A temperature and its evidence belong to one radio observation.
+        // An unqualified value cannot inherit the previous sample's timestamp.
+        if fields.contains_key("temperature") {
+            snapshot.remove("temperature_observation");
+        }
         snapshot.extend(fields);
         let payload = serde_json::to_vec(&snapshot).map_err(|_| SubmitError::Invalid)?;
-        let bytes = payload.len() + raw_action.as_ref().map_or(0, Vec::len);
+        let bytes = payload.len() + raw_action.as_ref().map_or(0, Vec::len)
+            + feedback.iter().map(|(route, bytes)| route.len() + bytes.len()).sum::<usize>();
         let state_changed = self.snapshots.get(device) != Some(&snapshot);
         if delivery != Delivery::Event {
             if state_changed
@@ -136,6 +147,7 @@ impl Pending {
                 delivery,
                 payload,
                 raw_action,
+                feedback,
                 expires: (delivery == Delivery::Event)
                     .then(|| tokio::time::Instant::now() + EVENT_TTL),
             },
@@ -153,7 +165,8 @@ impl Pending {
                 self.fill_state_slots();
             } else {
                 self.event_bytes -=
-                    item.payload.len() + item.raw_action.as_ref().map_or(0, Vec::len);
+                    item.payload.len() + item.raw_action.as_ref().map_or(0, Vec::len)
+                    + item.feedback.iter().map(|(route, bytes)| route.len() + bytes.len()).sum::<usize>();
             }
             if item
                 .expires
@@ -206,7 +219,7 @@ impl Pending {
         Some(item)
     }
 
-    fn remove_state_slot(&mut self, device: &str) {
+    pub(super) fn remove_state_slot(&mut self, device: &str) {
         if let Some(dirty) = self.dirty.remove(device)
             && let Some(item) = self.queued.remove(&dirty.slot)
         {
@@ -218,7 +231,7 @@ impl Pending {
     // returning consumer gets the most recent values without replaying gestures.
     pub(super) fn queue_birth_snapshot(&mut self) {
         for name in self.snapshots.keys() {
-            if self.identities.get(name.strip_prefix(RADIO_DIAGNOSTICS).unwrap_or(name)).is_some_and(|(id, _)| !self.inactive.contains(id))
+            if self.identities.get(feedback::owner(name).or_else(|| name.strip_prefix(RADIO_DIAGNOSTICS)).unwrap_or(name)).is_some_and(|(id, _)| !self.inactive.contains(id))
                 && !self.dirty.contains_key(name) && self.waiting_names.insert(name.clone())
             {
                 self.waiting.push_back(name.clone());
@@ -226,7 +239,7 @@ impl Pending {
         }
     }
 
-    fn defer_state(&mut self, device: &str) {
+    pub(super) fn defer_state(&mut self, device: &str) {
         if self.waiting_names.insert(device.to_owned()) {
             self.waiting.push_back(device.to_owned());
         }
@@ -280,17 +293,24 @@ impl Pending {
                 payload,
                 expires: None,
                 raw_action: None,
+                feedback: Vec::new(),
             },
         );
         Ok(())
     }
 
     pub(super) fn clear_device(&mut self, device: &str) {
+        self.live_light.remove(device);
+        for input in [device.to_owned(), diagnostic_route(device)] {
+            if let Some(fields) = self.feedback.remove(&input) {
+                for key in fields { self.clear_snapshot(&format!("bridge/feedback/{device}/{key}")); }
+            }
+        }
         self.clear_snapshot(&diagnostic_route(device));
         self.clear_snapshot(device);
     }
 
-    fn clear_snapshot(&mut self, device: &str) {
+    pub(super) fn clear_snapshot(&mut self, device: &str) {
         self.snapshots.remove(device);
         self.remove_state_slot(device);
         self.waiting_names.remove(device);
@@ -301,7 +321,8 @@ impl Pending {
             }
             if item.delivery != Delivery::State {
                 self.event_bytes -=
-                    item.payload.len() + item.raw_action.as_ref().map_or(0, Vec::len);
+                    item.payload.len() + item.raw_action.as_ref().map_or(0, Vec::len)
+                    + item.feedback.iter().map(|(route, bytes)| route.len() + bytes.len()).sum::<usize>();
             }
             false
         });

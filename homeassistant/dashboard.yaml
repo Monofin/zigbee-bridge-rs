@@ -2,3 +2,4 @@ strategy:
   type: custom:zigbee-bridge
   base_topic: zigbee2mqtt
   binding_script: script.zigbee_binding
+  naming_script: script.zigbee_device_naming

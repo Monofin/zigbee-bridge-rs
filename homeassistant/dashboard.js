@@ -82,12 +82,17 @@ class ZigbeeDashboard extends HTMLElement {
     }
     const maintenance = [tile(version, "Admin API", {icon: "mdi:api"})];
     if (id("health_check")) maintenance.push(action(id("health_check"), "Check coordinator", "button.press"));
-    for (const [key, label] of [["health_result", "Last coordinator check"], ["bind", "Last binding"], ["unbind", "Last unbinding"]]) {
+    for (const [key, label] of [["health_result", "Last coordinator check"], ["bind", "Last binding"], ["unbind", "Last unbinding"], ["display_name", "Last display name change"], ["rename_route", "Last MQTT route change"]]) {
       const entity = id(key);
       if (entity) maintenance.push(tile(entity, label, {visibility: [hasResult(entity)]}));
     }
     if (config.binding_script && hass.states[config.binding_script]) {
       maintenance.push(tile(config.binding_script, "Manage bindings", {
+        hide_state: true, tap_action: {action: "more-info"}, icon_tap_action: {action: "more-info"}, visibility: supported,
+      }));
+    }
+    if (config.naming_script && hass.states[config.naming_script]) {
+      maintenance.push(tile(config.naming_script, "Name a device", {
         hide_state: true, tap_action: {action: "more-info"}, icon_tap_action: {action: "more-info"}, visibility: supported,
       }));
     }

@@ -399,7 +399,7 @@ def entity(topic, component, domain, fields):
     ids = identifiers(fields)
     uid = fields.get("unique_id")
     routes = {k: route(v, fields.get("~")) for k, v in fields.items()
-              if k.endswith(("state_topic", "command_topic")) or k == "topic"}
+              if k.endswith(("state_topic", "command_topic")) or k in {"topic", "position_topic", "tilt_status_topic", "current_temperature_topic"}}
     item = Declaration(fields, topic=topic, component=component, domain=domain, device_ids=ids, routes=routes)
     if domain == "device_automation":
         if ids and all(isinstance(fields.get(k), str) and fields[k] for k in

@@ -101,7 +101,7 @@ impl Bindings {
         prefix: &str,
         coordinator_ieee: Option<u64>,
     ) -> Result<BTreeMap<String, serde_json::Value>> {
-        use crate::mqtt::discovery::{admin_configs, configs};
+        use crate::mqtt::discovery::{admin_configs, configs_named};
         let mut result = BTreeMap::new();
         let mut add = |(topic, bytes): (String, Vec<u8>)| -> Result<()> {
             ensure!(
@@ -120,7 +120,7 @@ impl Bindings {
         if let Some(ieee)=coordinator_ieee {for entry in admin_configs(base,prefix,ieee)? {add(entry)?;}}
         for &ieee in self.peers.keys() {
             for (ep, feature) in self.member_features(ieee)? {
-                for entry in configs(base, prefix, &ep, feature, false)? { add(entry)?; }
+                for entry in configs_named(base, prefix, &ep, feature, false, self.naming.display(ieee))? { add(entry)?; }
             }
         }
         Ok(result)
@@ -134,7 +134,9 @@ impl Bindings {
                 .entry(format!("0x{ieee:016x}"))
                 .or_insert((ieee, 255));
         }
-        out.set_routes(routes)
+        out.set_routes(routes)?;
+        out.set_display_names(self.naming.displays());
+        Ok(())
     }
 
     /// Use the Basic identity and descriptors from one complete interview. An
@@ -224,10 +226,9 @@ impl Bindings {
             }
         }
         let ieee = ieee.context("missing interview identity")?;
-        let name = names
-            .get(&ieee)
-            .cloned()
-            .unwrap_or_else(|| format!("0x{ieee:016x}"));
+        let name = self.naming.route(ieee, names);
+        ensure!(!self.peers.iter().any(|(&id, (other, _))| id != ieee && *other == name)
+            && self.topics.get(&name).is_none_or(|id| id.0 == ieee), "duplicate device route");
         let lights = StandardLights::builtin()?;
         let outlets = zigbee_devices::outlet::Outlets::builtin()?;
         let inputs = zigbee_devices::input::Inputs::builtin()?;
@@ -403,6 +404,7 @@ impl Bindings {
                     controls,
                     level_state: Default::default(),
                     confirmed_hue_scene: None,
+                    needs_light_power: false,
                     name: name.clone(),
                     device_name: name.clone(),
                     access: reviewed.map(|r| (r.state, r.brightness)),
@@ -680,9 +682,11 @@ impl Bindings {
                         );
                         continue;
                     }
-                    let confirm = matches!(setting, Setting::State(_)) && transition == 0
-                        && b.permits(Property::State, |access| access.read);
-                    (lamp.set(setting, transition, seq)?, confirm.then_some(Read::ConfirmOnOff))
+                    let read = match setting {
+                        Setting::State(on) if transition == 0 && b.permits(Property::State, |a| a.read) => Some(Read::ConfirmOnOff(on)),
+                        _ => None,
+                    };
+                    (lamp.set(setting, transition, seq)?, read)
                 }
             };
             steps.push(step);

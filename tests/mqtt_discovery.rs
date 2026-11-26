@@ -93,7 +93,7 @@ async fn late_ha_replays_config_rename_keeps_ids_and_only_removal_retracts() -> 
         let initial = retained().await?;
         assert_eq!(initial.len(), 10);
         let lqi = &initial["ha-test/sensor/0x0000000000000003/linkquality/config"];
-        assert_eq!(lqi["state_topic"], "bench-discovery/bridge/diagnostics/test multisensor");
+        assert_eq!(lqi["state_topic"], "bench-discovery/bridge/feedback/test multisensor/linkquality");
         assert_eq!(lqi["unit_of_measurement"], "lqi");
         assert_eq!(lqi["enabled_by_default"], false);
         assert_eq!(lqi["entity_category"], "diagnostic");

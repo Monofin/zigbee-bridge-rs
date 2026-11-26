@@ -102,7 +102,11 @@ impl Store {
         let lock=open_regular(&root.join("bridge.lock"),File::options().read(true))?;
         lock.try_lock_shared().context("staged state is in use")?;
         let _guard = StoreLock::acquired(lock);
-        let registry=decode_registry(open_regular(&root.join("devices.json"),File::options().read(true))?)?;
+        let registry = match open_regular(&root.join("devices.json"), File::options().read(true)) {
+            Ok(file) => decode_registry(file)?,
+            Err(e) if e.kind() == io::ErrorKind::NotFound => Registry::default(),
+            Err(e) => return Err(e.into()),
+        };
         read(&registry)
     }
 

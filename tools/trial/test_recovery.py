@@ -29,6 +29,24 @@ class DiagnosticRouteTests(unittest.TestCase):
         self.assertFalse(trial.diagnostic_move(dict(change, new=dict(old)), base))
 
 
+    def test_light_feedback_move_preserves_owner_property_and_control(self):
+        base = "house/zigbee"
+        route = base + "/room/light"
+        old = dict(domain="light", device_ids=["zigbee2mqtt_0x0000000000000007"],
+                   topic="ha/light/device/light/config",
+                   routes={"state_topic": route, "command_topic": route + "/set"})
+        feedback = base + "/bridge/feedback/room/light/@light"
+        new = dict(old, routes=dict(old["routes"], state_topic=feedback))
+        change = dict(fields=["routes"], old=old, new=new)
+        self.assertTrue(trial.feedback_move(change, base))
+        for key, value in [("state_topic", feedback.replace("/room/", "/hall/")),
+                           ("state_topic", feedback.replace("@light", "update")),
+                           ("command_topic", route + "/set/other")]:
+            wrong = dict(new, routes=dict(new["routes"], **{key: value}))
+            self.assertFalse(trial.feedback_move(dict(change, new=wrong), base))
+        self.assertFalse(trial.feedback_move(dict(change, fields=["routes", "unique_id"]), base))
+
+
 class RecoveryTests(unittest.TestCase):
     def setUp(self):
         tmp = TemporaryDirectory()

@@ -214,6 +214,7 @@ struct Lamps {
     permit_broadcast_open: bool,
     enrolment: enrolment::Radio,
     switched: BTreeSet<u16>,
+    power_reads: BTreeMap<u16, u8>,
     buttons_sent: bool,
     scenario: Scenario,
     walk_address_requested: bool,
@@ -706,7 +707,8 @@ impl Lamps {
                     .context("stale TX address")?;
                 ensure!((1..=BUTTON).contains(&light), "unexpected TX destination");
                 ensure!(
-                    u16::from_le_bytes([*cl, *ch]) == (if light == BUTTON { 1 } else { 6 })
+                    (u16::from_le_bytes([*cl, *ch]) == (if light == BUTTON { 1 } else { 6 })
+                        || (self.scenario == Scenario::Feedback && light == state_feedback::LIGHT && [*cl,*ch] == [8,0]))
                         && *ep == endpoint(light)
                         && *len as usize == payload.len(),
                     "wrong cluster or payload length: {args:02x?}"
@@ -727,9 +729,30 @@ impl Lamps {
                 sent.extend([
                     0, *lo, *hi, 4, 1, *cl, *ch, 1, *ep, 0x40, 1, 0, 0, 0, *tag, 0, 0,
                 ]);
-                callbacks.push(sent);
+                if self.scenario != Scenario::PowerBurst || light != 2 || frame.header.frame_type != FrameType::ClusterSpecific {
+                    callbacks.push(sent);
+                }
+                if self.scenario == Scenario::PowerBurst {
+                    if frame.header.frame_type == FrameType::ClusterSpecific {
+                        ensure!(frame.payload.is_empty() && self.switched.insert(light), "switch command replayed");
+                    } else {
+                        ensure!(frame.payload == [0, 0] && self.switched.contains(&light));
+                        let previous = self.power_reads.insert(light, *tag);
+                        // Lamp 3 loses its first confirmation. On retry, its old reply arrives first.
+                        if light != 3 || previous.is_some() {
+                            if let Some(old_tag) = previous {
+                                ensure!(light == 3 && old_tag != *tag, "unexpected or ambiguous retry");
+                                callbacks.push(incoming(light, 6, &[8, old_tag, 1, 0, 0, 0, 0x10, 1]));
+                            }
+                            callbacks.push(incoming(light, 6, &[8, *tag, 1, 0, 0, 0, 0x10, 0]));
+                        }
+                    }
+                    queue.push_back(response);
+                    queue.extend(callbacks);
+                    return Ok(());
+                }
                 if self.scenario == Scenario::Feedback && light == state_feedback::LIGHT {
-                    callbacks.extend(state_feedback::respond(frame, &mut self.switched)?);
+                    callbacks.extend(state_feedback::respond(*cl, frame, &mut self.switched)?);
                     queue.push_back(response);
                     queue.extend(callbacks);
                     return Ok(());
@@ -756,7 +779,14 @@ impl Lamps {
                         callbacks.push(incoming(BUTTON,0x20,&[0x19,0xa7,0]));
                     }
                     FrameType::General => {
-                        ensure!(self.switched.contains(&light) && frame.payload == [0, 0], "unexpected state read");
+                        ensure!(frame.payload == [0, 0], "unexpected state attribute");
+                        if !self.switched.contains(&light) {
+                            // A spontaneous level report also makes the bridge read power once.
+                            callbacks.push(incoming(light, 6, &[8, *tag, 1, 0, 0, 0, 0x10, 1]));
+                            queue.push_back(response);
+                            queue.extend(callbacks);
+                            return Ok(());
+                        }
                         if light != 1 {
                             callbacks.push(incoming(light, 6, &[8, *tag, 1, 0, 0, 0, 0x10, 0]));
                             queue.push_back(response);
@@ -824,6 +854,7 @@ async fn ncp_with_offline_reports(port: &mut SerialStream, protocol: u8, restore
         bindings_seen: BTreeSet::new(),
         bind_conflict_sent:false,
         switched: BTreeSet::new(),
+        power_reads: BTreeMap::new(),
         buttons_sent: false,
         scenario,
         walk_address_requested: false,
@@ -1119,9 +1150,15 @@ async fn client_work(member: &std::path::Path, base: &str) -> Result<()> {
         {
             let light: u16 = suffix.parse()?;
             if body.get("state").is_some() {
+                // Lamp 4's addressed power reply can arrive while its unsolicited
+                // brightness reports are still awaiting reverse address discovery.
+                if light == 4 && body["state"] == "OFF"
+                    && (body.get("brightness").is_none() || body["brightness"] == 240) {
+                    continue;
+                }
                 ensure!(
                     body["state"] == "OFF" && (body["brightness"] == light || (light == 1 && admin_test && body["brightness"] == 77)),
-                    "unconfirmed state: {body}"
+                    "unconfirmed state on {topic}: {body}"
                 );
                 seen.insert(light);
                 if light == 1 { confirmed_off = true; }
@@ -1182,7 +1219,7 @@ async fn roundtrip(protocol: u8) -> Result<()> {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-enum Scenario { Commands, Restored, Feedback, Walk, Observations }
+enum Scenario { Commands, Restored, Feedback, PowerBurst, Walk, Observations }
 
 #[tokio::test]
 #[ignore = "requires isolated loopback MQTT broker on port 1883"]
@@ -1277,6 +1314,7 @@ async fn run_session(protocol:u8,base:&str,dir:&std::path::Path,session:Scenario
         let observer=async {
             match session {
                 Scenario::Feedback => state_feedback::observe().await,
+                Scenario::PowerBurst => state_feedback::observe_burst(base).await,
                 Scenario::Observations => cold_observations::observe(base).await,
                 Scenario::Walk => observe_startup_walk(base).await,
                 Scenario::Restored => admin_replay::verify(base).await,

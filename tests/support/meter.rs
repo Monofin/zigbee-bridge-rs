@@ -106,7 +106,7 @@ pub fn bind(bindings: &mut Bindings) -> Result<()> {
             let energy = snapshot
                 .values()
                 .find(|p| {
-                    p["state_topic"] == format!("fixture/meter-{device}")
+                    p["state_topic"] == format!("fixture/bridge/feedback/meter-{device}/energy")
                         && p["device_class"] == "energy"
                 })
                 .ok_or_else(|| anyhow::anyhow!("missing cumulative energy discovery"))?;

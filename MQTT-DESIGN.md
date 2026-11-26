@@ -21,7 +21,9 @@ Accepted design · 23 November 2026 · updated 24 November 2026 for MQTT 5 trans
 
 ## Device activity and light state
 
-The device topic carries merged appliance readings. Radio reception updates `last_seen` and `linkquality` on `<base>/bridge/diagnostics/<device>`. These topics drain independently and use the same checkpoint and device identity. Home Assistant discovery points both diagnostic sensors at the diagnostic topic. Consumers that read these fields directly should subscribe there.
+The device topic carries merged appliance readings. Radio reception updates `last_seen` and `linkquality` on `<base>/bridge/diagnostics/<device>`. These topics drain independently and use the same checkpoint and device identity. Home Assistant discovery binds each state subscription to `<base>/bridge/feedback/<device-or-endpoint>/<field>`. A new report publishes only the affected fields. For example, a firmware query publishes `update`, and a humidity measurement publishes `humidity`. Consumers of the aggregate device and diagnostic topics keep their existing routes. The bridge keeps command topics, entity IDs and action payloads stable.
+
+A JSON light consumes the compound `@light` feed. Its first publication requires an On/Off confirmation in this radio session. Brightness, colour or an effect received first waits for power readback. Once power is known, each lighting report carries the observed lighting fields together. Firmware queries and radio diagnostics leave that feed quiet. Thermostat mode, temperature and setpoint have independent feedback routes. The `@barrier` feed combines movement and position. A Home Assistant birth or broker reconnect replays the available state feeds, while button actions and other events remain transient. The compatibility snapshots supply the durable checkpoint for entity fields; individual subscriptions add no disk writes.
 
 After successful APS delivery of an immediate On/Off command to a readable light, the coordinator requests OnOff (cluster 0x0006, attribute 0x0000) from the same device and endpoint. MQTT publishes the observed value from a matching response or a supported attribute report.
 
@@ -69,3 +71,11 @@ The managed listener writes changed readings in one redb transaction per checkpo
 On a live `online` birth at Home Assistant’s default `homeassistant/status` topic, the managed bridge queues each active device’s latest merged state through its existing bounded drain. Discovery and availability are retained. Reported state and actions are published without retain. A birth only replays reported state. [Home Assistant MQTT birth messages](https://www.home-assistant.io/integrations/mqtt/#birth-and-last-will-messages)
 
 A QoS 1 PUBACK with reason `0x10` completes delivery to the broker and increments a process-local diagnostic counter. The worker logs cumulative totals at powers of two to bound log volume. A refused managed deletion keeps its durable repair record. Other publish refusals fail the session before the delivery fence advances. A broker can return ordinary success even with zero subscribers. Delivery, replay and checkpoint decisions are independent of that diagnostic. [MQTT 5 §3.4.2.1](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html)
+
+The standard Temperature Measurement feed pairs `temperature` in degrees Celsius
+with `temperature_observation` for a decoded MeasuredValue report or a successful
+matched read. It contains `ieee`, `endpoint`, `kind` (`attributeReport` or
+`readResponse`) and `observed_at_ms` (Unix milliseconds at coordinator receipt).
+A new equal reading has its own observation time. Recovery and replay preserve
+the original time. Consumers must treat values without an observation as
+undated, including snapshots from older versions.

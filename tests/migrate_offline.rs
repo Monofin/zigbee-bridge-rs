@@ -247,7 +247,7 @@ fn temperature_override_survives_stage_and_only_changes_the_named_sensor() -> Re
         assert_eq!(options.len(), 1);
         assert!(options[0].0.ends_with("/temperature/config"));
         assert_eq!(options[0].1["force_update"], force);
-        assert_eq!(options[0].1["state_topic"], "bridge/Probe");
+        assert_eq!(options[0].1["state_topic"], "bridge/bridge/feedback/Probe/temperature");
         assert!(!serde_json::to_string(&rendered)?.contains(CANARY));
     }
     Ok(())
@@ -276,8 +276,7 @@ fn migration_restores_sensor_routes_without_inventing_measurements() -> Result<(
     let configs = members.discovery_snapshot("zb", "homeassistant", None)?;
     for property in ["battery","temperature","humidity","last_seen"] {
         let config = &configs[&format!("homeassistant/sensor/0x{IEEE:016x}/{property}/config")];
-        let route = if property == "last_seen" { "zb/bridge/diagnostics" } else { "zb" };
-        assert_eq!(config["state_topic"], format!("{route}/0x{IEEE:016x}"));
+        assert_eq!(config["state_topic"], format!("zb/bridge/feedback/0x{IEEE:016x}/{property}"));
         if property == "last_seen" { assert_eq!(config["device_class"], "timestamp"); }
     }
     assert!(!configs.keys().any(|t| t.contains("/voltage/")));

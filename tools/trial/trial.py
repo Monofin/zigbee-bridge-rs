@@ -6,6 +6,8 @@ import json
 import itertools
 import multiprocessing
 import os
+import re
+import shutil
 import socket
 from pathlib import Path
 import subprocess
@@ -169,6 +171,48 @@ def diagnostic_move(change, base):
             and new["routes"] == {"state_topic": base + "/bridge/diagnostics/" + topic[len(base) + 1:]})
 
 
+def feedback_move(change, base):
+    """Accept an HA feedback subscription on the same device and property only."""
+    old, new = change["old"], change["new"]
+    if change["fields"] != ["routes"] or old["routes"].keys() != new["routes"].keys():
+        return False
+    owners = old["device_ids"]
+    if len(owners) != 1 or not re.fullmatch(r"zigbee2mqtt_0x[0-9a-f]{16}", owners[0]):
+        return False
+    obj = re.sub(r"_ep[0-9]+$", "", new["topic"].split("/")[-2])
+    for key, previous in old["routes"].items():
+        target = new["routes"][key]
+        if target == previous:
+            continue
+        if not previous.startswith(base + "/") or not target.startswith(base + "/bridge/feedback/"):
+            return False
+        route, _, field = target.removeprefix(base + "/bridge/feedback/").rpartition("/")
+        if not route or previous != base + "/" + route:
+            return False
+        if key == "state_topic":
+            prop = obj
+            if old["domain"] == "switch":
+                prop = "state" if obj == "switch" else obj.removeprefix("switch_")
+            elif old["domain"] in {"lock", "valve", "light", "cover"}:
+                prop = {"lock":"lock_state", "valve":"state", "light":"@light",
+                        "cover":"@barrier" if obj == "barrier" else "state"}[old["domain"]]
+            if field != prop:
+                return False
+        elif key == "topic" and old["domain"] == "device_automation":
+            endpoint = re.match(r"ep_([0-9a-f]{2})_", obj)
+            if not endpoint or field != f"zcl_{endpoint[1]}_command":
+                return False
+        elif (old["domain"], key) == ("climate", "temperature_state_topic"):
+            if new["routes"].get("temperature_command_topic") != previous + "/set/" + field:
+                return False
+        elif field != {("climate","mode_state_topic"):"system_mode",
+                       ("climate","current_temperature_topic"):"local_temperature",
+                       ("cover","position_topic"):"barrier_position" if obj == "barrier" else "position",
+                       ("cover","tilt_status_topic"):"tilt"}.get((old["domain"],key)):
+            return False
+    return True
+
+
 def serve():
     check(running() and not MARKER.exists(), "original service must be running and no rollback pending")
     run = stage()
@@ -176,7 +220,7 @@ def serve():
     check(not any(original[k] for k in ("old_conflicts","new_conflicts","reassigned_discovery_slots")), "discovery identity conflict")
     differences = json.loads((run / "discovery-comparison.json").read_bytes())["differences"]
     base = json.loads((run / "broker.json").read_bytes())["base_topic"]
-    for entry in differences["missing"] + [entry["old"] for entry in differences["changed"] if not diagnostic_move(entry, base)]:
+    for entry in differences["missing"] + [entry["old"] for entry in differences["changed"] if not (diagnostic_move(entry, base) or feedback_move(entry, base))]:
         check(entry["device_ids"] and all(owner.startswith("zigbee2mqtt_bridge_") for owner in entry["device_ids"]),
               "household device discovery differs; inspect comparison before switching")
     marker(run)
@@ -193,7 +237,26 @@ def serve():
           "configuration or discovery changed at handover; restage")
     args = json.loads((frozen / "listener.json").read_bytes())
     # Use the stopped-state import for the session, and keep its ownership ledger for rollback.
-    (run / "runtime-state").symlink_to(frozen / "state")
+    state = frozen / "state"
+    if previous := os.environ.get("BRIDGE_TRIAL_PREVIOUS_RUN"):
+        # A supervised software upgrade keeps the candidate's transaction ledger,
+        # checkpoints and locally interviewed members. Refuse a different network
+        # or a changed migration baseline before copying a stopped state directory.
+        previous = Path(previous).resolve(strict=True)
+        check(previous.parent == ROOT / "runs", "previous run outside trial root")
+        prior = (previous / "runtime-state").resolve(strict=True)
+        check(prior.is_relative_to(ROOT / "runs"), "runtime state outside trial root")
+        for name in ("deployment.json", "owners.json", "source/configuration.yaml"):
+            check((previous / name).read_bytes() == (frozen / name).read_bytes(), "migration baseline changed")
+        old, new = [json.loads((p / "source/coordinator_backup.json").read_bytes()) for p in (previous, frozen)]
+        check(all(old[k] == new[k] for k in ("coordinator_ieee", "extended_pan_id", "pan_id", "channel"))
+              and old["network_key"]["key"] == new["network_key"]["key"], "coordinator network changed")
+        with (prior / "bridge.lock").open("rb") as locked:
+            fcntl.flock(locked, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            state = frozen / "resumed-state"
+            shutil.copytree(prior, state)
+        args[2] = str(state)
+    (run / "runtime-state").symlink_to(state)
     device = Path(args[1]).resolve(strict=True)
     check(not running(), "original service resumed")
     probe = subprocess.run(["fuser", str(device)], capture_output=True)

@@ -241,7 +241,7 @@ mod tests {
         let triggers = format!("ha/device_automation/0x{ieee:016x}");
         let generic = format!("{triggers}/ep_01_on_off/config");
         let configs = bindings.discovery_snapshot("base", "ha", None)?;
-        assert_eq!(configs[&generic]["topic"], "base/socket");
+        assert_eq!(configs[&generic]["topic"], "base/bridge/feedback/socket/zcl_01_command");
 
         // With the same client cluster, a native TS0041 action handler owns
         // the button gestures. Its discovery must not acquire duplicate triggers.
